@@ -78,6 +78,7 @@
 // ================================================
 void setup();
 void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize);
+void transmitADCSample(char * data, unsigned char type, unsigned int dataSize);
 unsigned int calcCheckSum();
 void setSampleRate(unsigned int sampleRate);
 //void swapBuffer();
@@ -88,5 +89,6 @@ enum tilstande handle_type(char input);
 void debug_print(char input, int value);
 void handle_generator();
 void evaluate_recieve();
+
 
 #endif /* MAIN_H_ */

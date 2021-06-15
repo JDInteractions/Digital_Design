@@ -71,7 +71,7 @@ int main(void){
 		case scope:
 		debug_print_int(recordLength);
  			if(adc_flag){
-	 			transmitUARTPackage(&sampleBuffer[uart_user][0], SCOPE_TYPE, recordLength);
+	 			transmitADCSample(&sampleBuffer[uart_user][0], SCOPE_TYPE, recordLength);
 				 adc_flag = 0;
 				 
  			}
@@ -436,31 +436,39 @@ void setSampleRate(unsigned int sampleRate){
 void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize){
 		
 		//Construct package		
-		sampleBuffer[uart_user][0] = 0x55;
-		sampleBuffer[uart_user][1] = 0xAA;
-		sampleBuffer[uart_user][2] = (dataSize+PADDING_SIZE) >> 8;
-		sampleBuffer[uart_user][3] = (dataSize+PADDING_SIZE);
-		sampleBuffer[uart_user][4] = type;
+		data[0] = 0x55;
+		data[1] = 0xAA;
+		data[2] = (dataSize+PADDING_SIZE) >> 8;
+		data[3] = (dataSize+PADDING_SIZE);
+		data[4] = type;
 		
-		//for(int i = HEADER_SIZE; i < HEADER_SIZE+dataSize; i++){
-			//UARToutputBuffer[i] = data[i-HEADER_SIZE];
-		//}
-		
-		
-		//int checksum = calcCheckSum();
-				//UARToutputBuffer[505] = 0x00;
-				//UARToutputBuffer[506] = 0x00;
-		//UARToutputBuffer[HEADER_SIZE+dataSize] = 0x00;//checksum << 8;
-		//UARToutputBuffer[HEADER_SIZE+dataSize+1] =0x00;// checksum; 
-		sampleBuffer[uart_user][HEADER_SIZE+dataSize] = 0x00;//checksum << 8;
-		sampleBuffer[uart_user][HEADER_SIZE+dataSize+1] = 0x00; //checksum;
-		//Start transmission by sending first byte, then enable transmit interrupt
-		//UDR1 = sampleBuffer[uart_user][0];//UARToutputBuffer[0];
-		//SETBIT(UCSR1B, TXCIE1);
+		int checksum = calcCheckSum();
+		data[HEADER_SIZE+dataSize] = checksum << 8;
+		data[HEADER_SIZE+dataSize+1] = checksum;
 			
 		//UDR1 = UARToutputBuffer[uart_cnt_tx++];
-		for(int i = 0; i < recordLength+PADDING_SIZE; i++){
-			putCharUSART(sampleBuffer[uart_user][i]);
+		for(int i = 0; i < dataSize+PADDING_SIZE; i++){
+			putCharUSART(data[i]);
 		}
 		
+}
+
+void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
+	
+	//Construct package
+	sampleBuffer[uart_user][0] = 0x55;
+	sampleBuffer[uart_user][1] = 0xAA;
+	sampleBuffer[uart_user][2] = (dataSize+PADDING_SIZE) >> 8;
+	sampleBuffer[uart_user][3] = (dataSize+PADDING_SIZE);
+	sampleBuffer[uart_user][4] = type;
+	
+	int checksum = calcCheckSum();
+	sampleBuffer[uart_user][HEADER_SIZE+dataSize] = checksum << 8;
+	sampleBuffer[uart_user][HEADER_SIZE+dataSize+1] = checksum;
+	
+	//UDR1 = UARToutputBuffer[uart_cnt_tx++];
+	for(int i = 0; i < recordLength+PADDING_SIZE; i++){
+		putCharUSART(sampleBuffer[uart_user][i]);
+	}
+	
 }
