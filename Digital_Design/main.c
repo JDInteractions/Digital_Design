@@ -101,6 +101,7 @@ int main(void){
 		spi_package[0]=7;
 		for(int i = 1; i<=255;i++){//adjust frequency 1 hz pr step
 			spi_package[1]=i;
+			putCharUSART(spi_package[1]);
 			//send SPI package
 			//vent - record sample (delay)
 			//bode_data[i-1]=ADC-sample
