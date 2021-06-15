@@ -107,8 +107,6 @@ int main(void){
 		}
 		//Transmit UART datapackage
 		tilstand = scope;
-		
-		
 		break;
 	}
 		
@@ -229,24 +227,27 @@ void handle_generator(){
 //Ligeledes opdateres telecommand-pakken.
 		case ENTER: 
 			if (param == shape_s){
-				telecommand[1] = SW;
+				telecommand[1+HEADER_SIZE] = SW;
+				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
 				spi_package[0]=4;
 				spi_package[1]=SW;	
 			}
 			
-			if (param == freq_s){
-				telecommand[3] = SW;	
+			else if (param == amplitude_s){
+				telecommand[2+HEADER_SIZE] = SW;
+				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
+				spi_package[0]=5;
+				spi_package[1]=SW;
+			}
+			
+			else if (param == freq_s){
+				telecommand[3+HEADER_SIZE] = SW;
+				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);	
 				spi_package[0]=7;
 				spi_package[1]=SW;
 				
 			}
-			if (param == amplitude_s){
-				telecommand[2] = SW;
-				spi_package[0]=5;
-				spi_package[1]=SW;
-				
-				
-			}
+			SW = 0;
 		break;
 
 //SELECT: Tilstandsloop, som gemmer v�rdien af den nuv�rende valgte parameter (amplitude, frekvens eller shape). 
@@ -254,20 +255,21 @@ void handle_generator(){
 		case SELECT:
 			switch(param){
 				case shape_s:
-				
-				telecommand[0]=1;
-				//transmit Generator DATA UART	
+				telecommand[HEADER_SIZE]=1;
+				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
 				param = amplitude_s;
 				break;
 				
 				case amplitude_s:
-				telecommand[0]=2;
+				telecommand[HEADER_SIZE]=2;
+				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
 				//transmit_generator
 				param = freq_s;
 				break;
 				
 				case freq_s:
-				telecommand[0] = 0;
+				telecommand[HEADER_SIZE] = 0;
+				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
 				//transmit_generator
 				param = shape_s;
 				break;
