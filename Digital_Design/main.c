@@ -28,7 +28,7 @@ char SW = 0;
 char BTN = 0;
 unsigned int compare = 0;
 char stop,reset = 0;
-char telecommand[4]={0};
+char telecommand[263]={0};
 char spi_package[2]={0};
 enum states {sync1, wait, sync2, Length, Length2, Type, ReadData, CS1, CS2};
 enum tilstande {scope, set_sample, set_gen, BodePlot};
@@ -70,11 +70,11 @@ int main(void){
 		//Grundtilstand. Tjek for uart-flag. skift tilstand baseret p� uart-type. 
 		case scope:
 		debug_print_int(recordLength);
- 			if(adc_flag){
-	 			transmitADCSample(&sampleBuffer[uart_user][0], SCOPE_TYPE, recordLength);
-				 adc_flag = 0;
+//  			if(adc_flag){
+// 	 			transmitADCSample(&sampleBuffer[uart_user][0], SCOPE_TYPE, recordLength);
+// 				 adc_flag = 0;
 				 
- 			}
+// 			}
 			if(flag_uart_rx==1){
 				flag_uart_rx=0;
 				tilstand = handle_type(uart_type);
@@ -263,14 +263,12 @@ void handle_generator(){
 				case amplitude_s:
 				telecommand[HEADER_SIZE]=2;
 				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
-				//transmit_generator
 				param = freq_s;
 				break;
 				
 				case freq_s:
 				telecommand[HEADER_SIZE] = 0;
 				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
-				//transmit_generator
 				param = shape_s;
 				break;
 			}
