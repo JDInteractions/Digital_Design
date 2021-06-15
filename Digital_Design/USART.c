@@ -26,7 +26,7 @@ void init_uart_interrupt1(unsigned int  ubrr){
 	UCSR1C |= (1<<UCSZ10) | (1<<UCSZ11);			//8-bit data
 	UBRR1H = (unsigned char)(ubrr>>8);				//UBRR(16-bit)
 	UBRR1L = (unsigned char)ubrr;
-	
+
 }
 
 //Initialize UART0
