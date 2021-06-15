@@ -46,6 +46,7 @@
 #define PADDING_SIZE	HEADER_SIZE+FOOTER_SIZE
 #define OUTPUT_BUF_UART	1008
 #define DATA_BUF	1008  
+#define TELE_PKG 263
  
 //Telemetry types
 #define BTN_TYPE	0x01
@@ -89,6 +90,7 @@ enum tilstande handle_type(char input);
 void debug_print(char input, int value);
 void handle_generator();
 void evaluate_recieve();
+void resetLabview();
 
 
 #endif /* MAIN_H_ */

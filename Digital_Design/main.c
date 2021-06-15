@@ -28,7 +28,7 @@ char SW = 0;
 char BTN = 0;
 unsigned int compare = 0;
 char stop,reset = 0;
-char telecommand[263]={0};
+char telecommand[TELE_PKG]={0};
 char spi_package[2]={0};
 enum states {sync1, wait, sync2, Length, Length2, Type, ReadData, CS1, CS2};
 enum tilstande {scope, set_sample, set_gen, BodePlot};
@@ -70,11 +70,11 @@ int main(void){
 		//Grundtilstand. Tjek for uart-flag. skift tilstand baseret p� uart-type. 
 		case scope:
 		debug_print_int(recordLength);
-//  			if(adc_flag){
-// 	 			transmitADCSample(&sampleBuffer[uart_user][0], SCOPE_TYPE, recordLength);
-// 				 adc_flag = 0;
+ 			if(adc_flag){
+	 			transmitADCSample(&sampleBuffer[uart_user][0], SCOPE_TYPE, recordLength);
+				 adc_flag = 0;
 				 
-// 			}
+			}
 			if(flag_uart_rx==1){
 				flag_uart_rx=0;
 				tilstand = handle_type(uart_type);
@@ -247,7 +247,6 @@ void handle_generator(){
 				spi_package[1]=SW;
 				
 			}
-			SW = 0;
 		break;
 
 //SELECT: Tilstandsloop, som gemmer v�rdien af den nuv�rende valgte parameter (amplitude, frekvens eller shape). 
@@ -275,12 +274,10 @@ void handle_generator(){
 			break;
 
 //Run/Stop: Toggle stop-char mellem de to start/stop v�rdier. Opdat�r SPI-pakken med tilh�rende v�rdi.		
-		case START_STOP: //run/stop
-			//toggle bit-0;
+		case START_STOP:
 			TOGGLEBIT(stop,0);
-// 			if(stop == 0x03){
-// 				stop = 0x02;
-// 			}
+			if(CHKBIT(stop,0)) CLRBIT(ADCSRA,ADEN);
+			else SETBIT(ADCSRA,ADEN);
 			spi_package[0] = stop;
 			spi_package[1] = 0;
 			//send stop-byte on SPI
@@ -291,10 +288,8 @@ void handle_generator(){
 			
 			spi_package[0] = RESET_SPI;
 			spi_package[1] = 0;
+			resetLabview();
 			//send reset_byte + 0data SPI;
-			
-
-			putCharUSART(0xff);
 			break;
 			
 	}
@@ -471,4 +466,11 @@ void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
 		putCharUSART(sampleBuffer[uart_user][i]);
 	}
 	
+}
+
+void resetLabview(){
+	param = shape_s;
+	state = sync1;
+	memset(telecommand,0,TELE_PKG);
+	transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
 }
