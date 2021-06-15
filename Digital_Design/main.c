@@ -16,7 +16,6 @@ volatile unsigned int uart_cnt_rx = 0;
 char UARTBuffer[datasize] = {0};
 unsigned int Len = 0;
 char uart_type = 0;
-char current_type = 0;
 unsigned int checksum_val = 0;
 char checksum_flag = 0;
 char rec_complete = 0;
@@ -85,8 +84,8 @@ int main(void){
 		
 		//"Send" er modtaget. Opdat�r S_rate og RL.
 		case set_sample:
-			S_Rate = ((unsigned int)data[0]<<8)|(unsigned int)data[1];
-			RL = ((unsigned int)data[2]<<8)|(unsigned int)data[3];
+			S_Rate = ((unsigned int)data[5]<<8)|(unsigned int)data[6];
+			RL = ((unsigned int)data[7]<<8)|(unsigned int)data[8];
 			setSampleRate(S_Rate);
 			recordLength = RL;
 			tilstand = scope;		
@@ -118,7 +117,7 @@ int main(void){
 		
 		
 		
-		for(int i=0;i<10;i++){
+		for(int i=5;i<15;i++){
 			OLED_buffer[i]=data[i]+0x30;
 		}		
 		sendStrXY(OLED_buffer,4,5);
@@ -155,7 +154,7 @@ ISR(ADC_vect){
 	
 	//Overflow
 	//if(bufferCounter[adc_user][0] > SAMPLE_BUF){
-		//bufferCounter[adc_user][0] = 0;
+	//bufferCounter[adc_user][0] = 0;
 	//}
 }
 
@@ -222,8 +221,8 @@ void debug_print(char input, int value){
 //Funktion, som skelner mellem tastetryk i generator-fanen.
 //BTN-byte og SW-byte gemmes i hver sin variabel. 
 void handle_generator(){
-	BTN = data[0];
-	SW = data[1];
+	BTN = data[5];
+	SW = data[6];
 
 //Tjek v�rdien af BTN	
 	switch(BTN)
@@ -307,30 +306,37 @@ void evaluate_recieve(){
 		
 		//Tjek om f�rste karakter er 0x55 og skift tilstand hvis sand. 
 		case sync1:
-		if(UARTBuffer[uart_cnt_rx++] == 0x55){
+			if(UARTBuffer[uart_cnt_rx] == 0x55){
+			data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
+			uart_cnt_rx++;
 			state = sync2;
-		}
-		break;
+			}
+			break;
 		
 		//Tjek om anden karakter er 0xAA og skift tilstand hvis sand. Ellers skift til tilstand Sync 1 igen.
 		case sync2:
-		if(UARTBuffer[uart_cnt_rx++]==0xAA){
-			state = Length;
+			if(UARTBuffer[uart_cnt_rx]==0xAA){
+				data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
+				state = Length;
+				uart_cnt_rx++;
+				}
+			else{
+				state = sync1;
+				uart_cnt_rx++;
 			}
-		else{
-			state = sync1;
-		}
-		break;
+			break;
 		
 		
 		//L�s l�ngden af den modtagne pakke (byte1)
 		case Length:
-		Len = (UARTBuffer[uart_cnt_rx++]<<8);
-		state = Length2;
-		break;
+			data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
+			Len = (UARTBuffer[uart_cnt_rx++]<<8);
+			state = Length2;
+			break;
 		
 		//L�s l�ngden af den modtagne pakke (byte2)
 		case Length2:
+		data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
 		Len = Len + (UARTBuffer[uart_cnt_rx++]);
 		compare = Len-2;
 		state = Type;			
@@ -338,6 +344,7 @@ void evaluate_recieve(){
 		
 		//L�s type-byten og gem den i en char. 
 		case Type:
+		data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
 		uart_type = UARTBuffer[uart_cnt_rx++];
 		state = ReadData;
 		break;
@@ -346,10 +353,9 @@ void evaluate_recieve(){
 		case ReadData:
 		if(Len>7){
 			if(uart_cnt_rx < (compare)){
-				data[uart_cnt_rx-5]=UARTBuffer[uart_cnt_rx];
+				data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
 				uart_cnt_rx++;
-//				break;
-				}
+			}
 				
 		//Hvis hele datapakken er l�st og gemt skiftes tilstand. 	
 			if(uart_cnt_rx==(compare)){
@@ -368,8 +374,8 @@ void evaluate_recieve(){
 		
 		//L�s anden checksum-byte og kontroller om den nye int checksum_val == 0x000
 		case CS2:
-		checksum_val = checksum_val + (UARTBuffer[uart_cnt_rx++]);
-		if(checksum_val==0x0000){
+		checksum_val = checksum_val | (UARTBuffer[uart_cnt_rx++]);
+		if(checksum_val==calcCheckSum(data,compare)){
 			rec_complete=1;	
 			uart_cnt_rx=0;
 			checksum_flag=0;
@@ -381,7 +387,8 @@ void evaluate_recieve(){
 			uart_cnt_rx=0;
 			state = sync1;
 			Len=0;
-		}		
+		}	
+		//debug_print_int(calcCheckSum(data,compare));
 		break;
 	}		
 }
@@ -399,7 +406,7 @@ int calcCheckSum(char * data, unsigned int dataSize){
 	}
 	else if(CKSUM_TYPE==1){
 		char checkSum = data[0];
-		for(int i = 1; i < dataSize; i++){
+		for(int i = 1; i <= dataSize; i++){
 			checkSum ^= data[i];
 		}
 		return 0x00 | checkSum;
