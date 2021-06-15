@@ -11,6 +11,7 @@
 
 #define F_CPU 16000000UL
 #define datasize 1007
+#define BAUD_EFFECT 11520UL
 
 #ifndef MAIN_H_
 #define MAIN_H_
@@ -75,7 +76,7 @@
 #define SAMPLE_BUF	1100 
 
 //Checksum
-#define CKSUM_TYPE	1	//ZERO16=0  ,  LRC8=1
+#define CKSUM_TYPE	0	//ZERO16=0  ,  LRC8=1
 
 
 
@@ -95,6 +96,6 @@ void debug_print(char input, int value);
 void handle_generator();
 void evaluate_recieve();
 void resetLabview();
-
+unsigned int sampleRate_comp();
 
 #endif /* MAIN_H_ */

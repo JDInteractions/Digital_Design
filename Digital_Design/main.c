@@ -22,7 +22,7 @@ char rec_complete = 0;
 char data[datasize] = {0};
 char OLED_buffer[20]={0};
 unsigned int RL = 0;
-unsigned int S_Rate = 0;
+unsigned int S_Rate, S_rate_max = 0;
 char SW = 0;
 char BTN = 0;
 unsigned int compare = 0;
@@ -87,6 +87,16 @@ int main(void){
 			RL = ((unsigned int)data[7]<<8)|(unsigned int)data[8];
 			setSampleRate(S_Rate);
 			recordLength = RL;
+			if(recordLength < 47){
+				S_rate_max = sampleRate_comp(recordLength);
+				if(S_rate_max > S_Rate){
+					setSampleRate(S_rate_max);
+				}
+// 				putCharUSART(S_rate_max>>8);
+// 				putCharUSART(S_rate_max);
+// 				
+ 				debug_print_int(S_rate_max);
+			}
 			tilstand = scope;		
 			break;
 		
@@ -123,7 +133,7 @@ int main(void){
 		debug_print(uart_type,5);
 		debug_print(rec_complete,6);
 		debug_print(checksum_flag,7);
-		sendStrXY("Data:",4,0);
+		sendStrXY("Max_rate:",4,0);
  		sendStrXY("Type:",5,0);
  		sendStrXY("Rec_comp:",6,0);
  		sendStrXY("Checksum_f:",7,0);
@@ -387,7 +397,7 @@ void evaluate_recieve(){
 			state = sync1;
 			Len=0;
 		}	
-		//debug_print_int(calcCheckSum(data,compare));
+		
 		break;
 	}		
 }
@@ -425,10 +435,20 @@ void debug_print_int(int input){
 	if(DEVEL){
 		char temp[100] = {0};
 		sprintf(temp,"%u",input);
-		sendStrXY(temp, 0,0);
+		sendStrXY(temp, 4,10);
 	}
 }	
 
+unsigned int sampleRate_comp(unsigned int input){
+	unsigned long dividend = BAUD_EFFECT*input;
+// 	putCharUSART(dividend>>24);
+// 	putCharUSART(dividend>>16);
+// 	putCharUSART(dividend>>8);
+// 	putCharUSART(dividend);
+	/*debug_print_int(dividend);*/
+	unsigned long samplerate = dividend/(input+PADDING_SIZE);
+	return samplerate;
+}
 
 // ================================================
 // ADC
