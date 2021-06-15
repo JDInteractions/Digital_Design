@@ -44,8 +44,8 @@
 #define HEADER_SIZE	5
 #define FOOTER_SIZE 2
 #define PADDING_SIZE	HEADER_SIZE+FOOTER_SIZE
-#define OUTPUT_BUF_UART	1008
-#define DATA_BUF	1008
+#define OUTPUT_BUF_UART	1007
+#define DATA_BUF	1007
 
 //Telemetry types
 #define BTN_TYPE	0x01
@@ -74,6 +74,10 @@
 
 #define SAMPLE_BUF	1100 
 
+//Checksum
+#define CKSUM_TYPE	1	//ZERO16=0  ,  LRC8=1
+
+
 
 // ================================================
 // Functions
@@ -81,9 +85,8 @@
 void setup();
 void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize);
 void transmitADCSample(char * data, unsigned char type, unsigned int dataSize);
-unsigned int calcCheckSum();
+int calcCheckSum(char * data, unsigned int dataSize);
 void setSampleRate(unsigned int sampleRate);
-//void swapBuffer();
 void readBuffer();
 void debug_print_char(char input);
 void debug_print_int(int input);

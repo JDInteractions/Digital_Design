@@ -56,6 +56,7 @@ int uart_user = 1;		//TODO char??
 unsigned int recordLength = 500;	
 unsigned int nextRecordLenght = 0;
 
+
 int main(void){ 
     
 	setup();
@@ -70,7 +71,7 @@ int main(void){
 		
 		//Grundtilstand. Tjek for uart-flag. skift tilstand baseret p� uart-type. 
 		case scope:
-		debug_print_int(recordLength);
+		
  			if(adc_flag){
 	 			transmitADCSample(&sampleBuffer[uart_user][0], SCOPE_TYPE, recordLength);
 				 adc_flag = 0;
@@ -391,9 +392,20 @@ void evaluate_recieve(){
 // Utils
 // ================================================
 
-unsigned int calcCheckSum(){
-	return 0x0000; 
+int calcCheckSum(char * data, unsigned int dataSize){
+	
+	if(CKSUM_TYPE == 0){
+		return 0x0000;
+	}
+	else if(CKSUM_TYPE==1){
+		char checkSum = data[0];
+		for(int i = 1; i < dataSize; i++){
+			checkSum ^= data[i];
+		}
+		return 0x00 | checkSum;
+	}
 }
+
 
 void debug_print_char(char input){
 	if(DEVEL){
@@ -442,7 +454,7 @@ void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize)
 		data[3] = (dataSize+PADDING_SIZE);
 		data[4] = type;
 		
-		int checksum = calcCheckSum();
+		int checksum = calcCheckSum(data, dataSize+HEADER_SIZE);
 		data[HEADER_SIZE+dataSize] = checksum << 8;
 		data[HEADER_SIZE+dataSize+1] = checksum;
 			
@@ -462,7 +474,7 @@ void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
 	sampleBuffer[uart_user][3] = (dataSize+PADDING_SIZE);
 	sampleBuffer[uart_user][4] = type;
 	
-	int checksum = calcCheckSum();
+	int checksum = calcCheckSum(data, dataSize+HEADER_SIZE);
 	sampleBuffer[uart_user][HEADER_SIZE+dataSize] = checksum << 8;
 	sampleBuffer[uart_user][HEADER_SIZE+dataSize+1] = checksum;
 	
