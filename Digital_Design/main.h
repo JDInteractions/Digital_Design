@@ -45,9 +45,8 @@
 #define FOOTER_SIZE 2
 #define PADDING_SIZE	HEADER_SIZE+FOOTER_SIZE
 #define OUTPUT_BUF_UART	1008
-#define DATA_BUF	1008  
-#define TELE_PKG 263
- 
+#define DATA_BUF	1008
+
 //Telemetry types
 #define BTN_TYPE	0x01
 #define SEND_TYPE	0x02
@@ -60,6 +59,8 @@
 #define GENERATOR_TYPE	0x01
 #define SCOPE_TYPE	0x02
 #define BODE_TYPE	0x03
+#define GEN_PKG 4
+#define BODE_PKG 255
 
 //BTN Type-values
 #define ENTER 0X00

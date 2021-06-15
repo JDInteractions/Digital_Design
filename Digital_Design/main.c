@@ -28,7 +28,8 @@ char SW = 0;
 char BTN = 0;
 unsigned int compare = 0;
 char stop,reset = 0;
-char telecommand[TELE_PKG]={0};
+char telecommand[GEN_PKG+PADDING_SIZE]={0};
+char bodeBuffer[BODE_PKG+PADDING_SIZE]={0};	
 char spi_package[2]={0};
 enum states {sync1, wait, sync2, Length, Length2, Type, ReadData, CS1, CS2};
 enum tilstande {scope, set_sample, set_gen, BodePlot};
@@ -92,23 +93,26 @@ int main(void){
 		
 		//Knaptryk fra "Generator" modtaget. Funktionen handle_generator behandler tastetryk. 
 		case set_gen:
-		handle_generator();
-		tilstand = scope;
-		break;
+			handle_generator();
+			tilstand = scope;
+			break;
 		
 		//"Start" er modtaget. Spi-pakken-opdateres og der loopes med increments af 1Hz.
 		case BodePlot:
-		spi_package[0]=7;
-		for(int i = 1; i<=255;i++){//adjust frequency 1 hz pr step
-			spi_package[1]=i;
-			putCharUSART(spi_package[1]);
-			//send SPI package
-			//vent - record sample (delay)
-			//bode_data[i-1]=ADC-sample
-		}
-		//Transmit UART datapackage
-		tilstand = scope;
-		break;
+			spi_package[0] = 7;
+			for(int i = 0; i<=255;i++){//adjust frequency 
+				spi_package[1]= sampleBuffer[adc_user][bufferCounter];
+				
+				//send SPI package
+				
+				//Wait to make sure ADC sample is taken at taget frequency TODO
+				_delay_ms(10);
+
+				bodeBuffer[i+HEADER_SIZE] = sampleBuffer[adc_user][HEADER_SIZE+bufferCounter];
+			}
+			transmitUARTPackage(bodeBuffer, BODE_TYPE, 255);
+			tilstand = scope;
+			break;
 	}
 		
 		
@@ -137,7 +141,7 @@ int main(void){
 
 //Service routine for ADC sample ready
 ISR(ADC_vect){
-	sampleBuffer[adc_user][5+bufferCounter++] = ADCH;
+	sampleBuffer[adc_user][HEADER_SIZE+bufferCounter++] = ADCH;
 	
 	if(bufferCounter >= recordLength){
 		adc_flag = 1;
@@ -472,6 +476,6 @@ void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
 void resetLabview(){
 	param = shape_s;
 	state = sync1;
-	memset(telecommand,0,TELE_PKG);
+	memset(telecommand,0,GEN_PKG);
 	transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
 }
