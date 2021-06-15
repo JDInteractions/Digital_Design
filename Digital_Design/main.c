@@ -55,11 +55,10 @@ int uart_user = 1;		//TODO char??
 unsigned int recordLength = 500;	
 unsigned int nextRecordLenght = 0;
 
-
 int main(void){ 
     
 	setup();
-	setSampleRate(7000);
+	setSampleRate(10000);
     
     while (1){
 		
@@ -406,7 +405,7 @@ int calcCheckSum(char * data, unsigned int dataSize){
 	}
 	else if(CKSUM_TYPE==1){
 		char checkSum = data[0];
-		for(int i = 1; i <= dataSize; i++){
+		for(int i = 1; i < dataSize+HEADER_SIZE; i++){
 			checkSum ^= data[i];
 		}
 		return 0x00 | checkSum;
@@ -461,7 +460,7 @@ void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize)
 		data[3] = (dataSize+PADDING_SIZE);
 		data[4] = type;
 		
-		int checksum = calcCheckSum(data, dataSize+HEADER_SIZE);
+		int checksum = calcCheckSum(data, dataSize);
 		data[HEADER_SIZE+dataSize] = checksum << 8;
 		data[HEADER_SIZE+dataSize+1] = checksum;
 			
@@ -481,7 +480,7 @@ void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
 	sampleBuffer[uart_user][3] = (dataSize+PADDING_SIZE);
 	sampleBuffer[uart_user][4] = type;
 	
-	int checksum = calcCheckSum(data, dataSize+HEADER_SIZE);
+	int checksum = calcCheckSum(data, dataSize);
 	sampleBuffer[uart_user][HEADER_SIZE+dataSize] = checksum << 8;
 	sampleBuffer[uart_user][HEADER_SIZE+dataSize+1] = checksum;
 	
