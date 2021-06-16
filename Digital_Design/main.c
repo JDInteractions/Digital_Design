@@ -25,24 +25,18 @@ unsigned int RL = 0;
 unsigned int S_Rate, S_rate_max = 0;
 char SW = 0;
 char BTN = 0;
-unsigned int compare = 0;
 char stop,reset = 0;
 char telecommand[GEN_PKG+PADDING_SIZE]={0};
 char bodeBuffer[BODE_PKG+PADDING_SIZE]={0};	
 char spi_package[2]={0};
-enum states {sync1, wait, sync2, Length, Length2, Type, ReadData, CS1, CS2};
+enum states {sync1, wait, sync2, Length, Length2, Type, ReadData, Check1, Check2};
 enum tilstande {scope, set_sample, set_gen, BodePlot};
 enum parameter {shape_s,amplitude_s,freq_s};
 char param = shape_s;
 char state = sync1;
 char tilstand = scope;
-char test = 0xff;
-char test2  = 0xfe;
-char test3 =0xfd; 
- unsigned char checkSum = 0;
 volatile char uart_tx_flag = 0;
 volatile int uart_cnt_tx = 1;
-
 unsigned int dataSizeTX = 0;
 volatile int uart_cnt = 0;	
 
@@ -126,7 +120,7 @@ int main(void){
 		
 		for(int i=5;i<15;i++){
 			OLED_buffer[i]=data[i]+0x30;
-		}		
+		}	
 		sendStrXY(OLED_buffer,4,5);
 		debug_print(uart_type,5);
 		debug_print(rec_complete,6);
@@ -297,7 +291,6 @@ void handle_generator(){
 
 //RESET: Toggle reset-byte og opdater dette i spi-package. 		
 		case RESET:
-			
 			spi_package[0] = RESET_SPI;
 			spi_package[1] = 0;
 			resetLabview();
@@ -326,12 +319,12 @@ void evaluate_recieve(){
 		case sync2:
 			if(UARTBuffer[uart_cnt_rx]==0xAA){
 				data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
-				state = Length;
 				uart_cnt_rx++;
+				state = Length;
 				}
 			else{
 				state = sync1;
-				uart_cnt_rx++;
+				uart_cnt_rx=0;
 			}
 			break;
 		
@@ -347,7 +340,6 @@ void evaluate_recieve(){
 		case Length2:
 		data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
 		Len = Len + (UARTBuffer[uart_cnt_rx++]);
-		compare = Len-2;
 		state = Type;			
 		break;
 		
@@ -360,47 +352,45 @@ void evaluate_recieve(){
 		
 		//L�s data, hvis der findes databytes i pakken og gem det i data[]  IF ELSE
 		case ReadData:
-			//debug_print_char(test);
-			if(Len>7){
-				if(uart_cnt_rx < (compare)){
-					data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
-					uart_cnt_rx++;
-				}
-				
-			//Hvis hele datapakken er l�st og gemt skiftes tilstand. 	
-				if(uart_cnt_rx==(compare)){
-					state = CS1;
-					uart_cnt_rx++;
-				}
-			}
-			else state = CS1;
-			//debug_print_char(test2);
+				if(uart_cnt_rx < Len-2){
+				data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
+				uart_cnt_rx++;
 			break;
+			}
+				
+		//Hvis hele datapakken er l�st og gemt skiftes tilstand. 	
+			else{ //(uart_cnt_rx==(compare))
+				state = Check1;
+				
+			}
+		
+		
 		
 		//L�s f�rste checksum-byte
-		case CS1:
-			checksum_val = (UARTBuffer[uart_cnt_rx++]<<8);
-			state = CS2;
-			break;
+		case Check1:
+		checksum_val = (UARTBuffer[uart_cnt_rx++]<<8);
+		state = Check2;
+		break;
 		
 		//L�s anden checksum-byte og kontroller om den nye int checksum_val == 0x000
-		case CS2:
-			checksum_val = checksum_val | (UARTBuffer[uart_cnt_rx++]);
-			if(checksum_val==calcCheckSum(data,compare)){
-				rec_complete=1;
-				uart_cnt_rx=0;
-				checksum_flag=0;
-				Len=0;
-				state = sync1;
-			}
-			else{
-				checksum_flag=1;
-				uart_cnt_rx=0;
-				state = sync1;
-				Len=0;
-			}
-			break;
-	}	
+		case Check2:
+		checksum_val = checksum_val | (UARTBuffer[uart_cnt_rx]);
+		if(checksum_val==calcCheckSum(data,Len-2)){
+			rec_complete=1;	
+			uart_cnt_rx=0;
+			checksum_flag=0;
+			Len=0;
+			state = sync1;
+			}	
+		else{
+			checksum_flag=1;
+			uart_cnt_rx=0;
+			state = sync1;
+			Len=0;
+		}	
+		
+		break;
+	}		
 }
 
 
@@ -436,7 +426,7 @@ void debug_print_int(int input){
 	if(DEVEL){
 		char temp[100] = {0};
 		sprintf(temp,"%u",input);
-		sendStrXY(temp, 0,0);
+		sendStrXY(temp, 4,8);
 	}
 }	
 
