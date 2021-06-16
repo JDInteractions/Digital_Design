@@ -38,9 +38,8 @@ char state = sync1;
 char tilstand = scope;
 char test = 0xff;
 char test2  = 0xfe;
-char test3 =0xfd;
-
- 
+char test3 =0xfd; 
+ unsigned char checkSum = 0;
 volatile char uart_tx_flag = 0;
 volatile int uart_cnt_tx = 1;
 
@@ -90,7 +89,7 @@ int main(void){
 			RL = ((unsigned int)data[7]<<8)|(unsigned int)data[8];
 			setSampleRate(S_Rate);
 			recordLength = RL;
-			if(recordLength < 47){
+			if(recordLength < MIN_RECORD_LENGTH){
 				S_rate_max = sampleRate_comp(recordLength);
 				if(S_Rate > S_rate_max){
 					setSampleRate(S_rate_max);
@@ -308,6 +307,8 @@ void handle_generator(){
 	}
 }
 
+
+
 //Tilstandsmaskine, som genneml�ber datapakkens bestandele. 
 void evaluate_recieve(){
 	switch(state){
@@ -359,49 +360,47 @@ void evaluate_recieve(){
 		
 		//L�s data, hvis der findes databytes i pakken og gem det i data[]  IF ELSE
 		case ReadData:
-		//debug_print_char(test);
-		if(Len>7){
-			if(uart_cnt_rx < (compare)){
-				data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
-				uart_cnt_rx++;
-			}
+			//debug_print_char(test);
+			if(Len>7){
+				if(uart_cnt_rx < (compare)){
+					data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
+					uart_cnt_rx++;
+				}
 				
-		//Hvis hele datapakken er l�st og gemt skiftes tilstand. 	
-			if(uart_cnt_rx==(compare)){
-				state = CS1;
-				uart_cnt_rx++;
+			//Hvis hele datapakken er l�st og gemt skiftes tilstand. 	
+				if(uart_cnt_rx==(compare)){
+					state = CS1;
+					uart_cnt_rx++;
+				}
 			}
-		}
-		else state = CS1;
-		//debug_print_char(test2);
-		break;
+			else state = CS1;
+			//debug_print_char(test2);
+			break;
 		
 		//L�s f�rste checksum-byte
 		case CS1:
-		checksum_val = (UARTBuffer[uart_cnt_rx++]<<8);
-		state = CS2;
-		break;
+			checksum_val = (UARTBuffer[uart_cnt_rx++]<<8);
+			state = CS2;
+			break;
 		
 		//L�s anden checksum-byte og kontroller om den nye int checksum_val == 0x000
 		case CS2:
-		
-		checksum_val = checksum_val | (UARTBuffer[uart_cnt_rx++]);
-		if(checksum_val==calcCheckSum(data,compare)){
-			rec_complete=1;	
-			uart_cnt_rx=0;
-			checksum_flag=0;
-			Len=0;
-			state = sync1;
-			}	
-		else{
-			checksum_flag=1;
-			uart_cnt_rx=0;
-			state = sync1;
-			Len=0;
-		}	
-		
-		break;
-	}		
+			checksum_val = checksum_val | (UARTBuffer[uart_cnt_rx++]);
+			if(checksum_val==calcCheckSum(data,compare)){
+				rec_complete=1;
+				uart_cnt_rx=0;
+				checksum_flag=0;
+				Len=0;
+				state = sync1;
+			}
+			else{
+				checksum_flag=1;
+				uart_cnt_rx=0;
+				state = sync1;
+				Len=0;
+			}
+			break;
+	}	
 }
 
 
@@ -410,14 +409,14 @@ void evaluate_recieve(){
 // Utils
 // ================================================
 
-int calcCheckSum(char * data, unsigned int dataSize){
+unsigned int calcCheckSum(char * data, unsigned int dataSize){
 	
 	if(CKSUM_TYPE == 0){
 		return 0x0000;
 	}
 	else if(CKSUM_TYPE==1){
-		char checkSum = data[0];
-		for(int i = 1; i < dataSize+HEADER_SIZE; i++){
+		unsigned char checkSum = 0;
+		for(int i = 0; i < dataSize+HEADER_SIZE; i++){
 			checkSum ^= data[i];
 		}
 		return 0x00 | checkSum;
@@ -476,9 +475,9 @@ void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize)
 		data[3] = (dataSize+PADDING_SIZE);
 		data[4] = type;
 		
-		int checksum = calcCheckSum(data, dataSize);
-		data[HEADER_SIZE+dataSize] = checksum << 8;
-		data[HEADER_SIZE+dataSize+1] = checksum;
+		unsigned int checksum = calcCheckSum(data, dataSize);
+		data[HEADER_SIZE+dataSize] = checksum >> 8;
+		data[HEADER_SIZE+dataSize+1] = checksum & 0xFF;
 			
 		//UDR1 = UARToutputBuffer[uart_cnt_tx++];
 		for(int i = 0; i < dataSize+PADDING_SIZE; i++){
@@ -496,12 +495,12 @@ void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
 	sampleBuffer[uart_user][3] = (dataSize+PADDING_SIZE);
 	sampleBuffer[uart_user][4] = type;
 	
-	int checksum = calcCheckSum(data, dataSize);
-	sampleBuffer[uart_user][HEADER_SIZE+dataSize] = checksum << 8;
-	sampleBuffer[uart_user][HEADER_SIZE+dataSize+1] = checksum;
+	unsigned int checksum = calcCheckSum(data, dataSize);
+	sampleBuffer[uart_user][HEADER_SIZE+dataSize] = checksum >> 8;
+	sampleBuffer[uart_user][HEADER_SIZE+dataSize+1] = checksum & 0xFF;
 	
 	//UDR1 = UARToutputBuffer[uart_cnt_tx++];
-	for(int i = 0; i < recordLength+PADDING_SIZE; i++){
+	for(int i = 0; i < dataSize+PADDING_SIZE; i++){
 		putCharUSART(sampleBuffer[uart_user][i]);
 	}
 	

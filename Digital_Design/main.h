@@ -72,11 +72,11 @@
 //ADC
 #define ADC_CHANNEL	0
 #define ADC_TRIG_SRC_PS	64
-
+#define MIN_RECORD_LENGTH	47
 #define SAMPLE_BUF	1100 
 
 //Checksum
-#define CKSUM_TYPE	0	//ZERO16=0  ,  LRC8=1
+#define CKSUM_TYPE	1	//ZERO16=0  ,  LRC8=1
 
 
 
@@ -86,7 +86,7 @@
 void setup();
 void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize);
 void transmitADCSample(char * data, unsigned char type, unsigned int dataSize);
-int calcCheckSum(char * data, unsigned int dataSize);
+unsigned int calcCheckSum(char * data, unsigned int dataSize);
 void setSampleRate(unsigned int sampleRate);
 void readBuffer();
 void debug_print_char(char input);
