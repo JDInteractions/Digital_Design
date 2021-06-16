@@ -36,6 +36,9 @@ enum parameter {shape_s,amplitude_s,freq_s};
 char param = shape_s;
 char state = sync1;
 char tilstand = scope;
+char test = 0xff;
+char test2  = 0xfe;
+char test3 =0xfd;
 
  
 volatile char uart_tx_flag = 0;
@@ -89,13 +92,9 @@ int main(void){
 			recordLength = RL;
 			if(recordLength < 47){
 				S_rate_max = sampleRate_comp(recordLength);
-				if(S_rate_max > S_Rate){
+				if(S_Rate > S_rate_max){
 					setSampleRate(S_rate_max);
 				}
-// 				putCharUSART(S_rate_max>>8);
-// 				putCharUSART(S_rate_max);
-// 				
- 				debug_print_int(S_rate_max);
 			}
 			tilstand = scope;		
 			break;
@@ -114,7 +113,7 @@ int main(void){
 				
 				//send SPI package
 				
-				//Wait to make sure ADC sample is taken at taget frequency TODO
+				//Wait to make sure ADC sample is taken at target frequency TODO
 				_delay_ms(10);
 
 				bodeBuffer[i+HEADER_SIZE] = sampleBuffer[adc_user][HEADER_SIZE+bufferCounter];
@@ -133,7 +132,7 @@ int main(void){
 		debug_print(uart_type,5);
 		debug_print(rec_complete,6);
 		debug_print(checksum_flag,7);
-		sendStrXY("Max_rate:",4,0);
+		//sendStrXY("Max_rate:",4,0);
  		sendStrXY("Type:",5,0);
  		sendStrXY("Rec_comp:",6,0);
  		sendStrXY("Checksum_f:",7,0);
@@ -360,6 +359,7 @@ void evaluate_recieve(){
 		
 		//L�s data, hvis der findes databytes i pakken og gem det i data[]  IF ELSE
 		case ReadData:
+		//debug_print_char(test);
 		if(Len>7){
 			if(uart_cnt_rx < (compare)){
 				data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
@@ -373,6 +373,7 @@ void evaluate_recieve(){
 			}
 		}
 		else state = CS1;
+		//debug_print_char(test2);
 		break;
 		
 		//L�s f�rste checksum-byte
@@ -383,6 +384,7 @@ void evaluate_recieve(){
 		
 		//L�s anden checksum-byte og kontroller om den nye int checksum_val == 0x000
 		case CS2:
+		
 		checksum_val = checksum_val | (UARTBuffer[uart_cnt_rx++]);
 		if(checksum_val==calcCheckSum(data,compare)){
 			rec_complete=1;	
@@ -435,18 +437,13 @@ void debug_print_int(int input){
 	if(DEVEL){
 		char temp[100] = {0};
 		sprintf(temp,"%u",input);
-		sendStrXY(temp, 4,10);
+		sendStrXY(temp, 0,0);
 	}
 }	
 
 unsigned int sampleRate_comp(unsigned int input){
 	unsigned long dividend = BAUD_EFFECT*input;
-// 	putCharUSART(dividend>>24);
-// 	putCharUSART(dividend>>16);
-// 	putCharUSART(dividend>>8);
-// 	putCharUSART(dividend);
-	/*debug_print_int(dividend);*/
-	unsigned long samplerate = dividend/(input+PADDING_SIZE);
+	unsigned int samplerate = dividend/(input+PADDING_SIZE);
 	return samplerate;
 }
 
@@ -460,7 +457,6 @@ void setSampleRate(unsigned int sampleRate){
 	int compareValue = (F_CPU/(2*sampleRate))/ADC_TRIG_SRC_PS-1;
 	OCR1A = compareValue;
 	OCR1B = compareValue;
-	//debug_print_int(OCR1A);
 }
 
 
