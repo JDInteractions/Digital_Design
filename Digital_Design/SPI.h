@@ -17,6 +17,7 @@ extern void init_spi_master();
 extern void init_spi_slave();
 extern void transmit_spi_master(unsigned char cx);
 extern unsigned char receive_spi_slave(void);
+extern void transmit_Spi_pkg(char *data, char size);
 
 
 #endif /* SPI_H_ */

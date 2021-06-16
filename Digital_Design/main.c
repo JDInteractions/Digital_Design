@@ -28,7 +28,7 @@ char BTN = 0;
 char stop,reset = 0;
 char telecommand[GEN_PKG+PADDING_SIZE]={0};
 char bodeBuffer[BODE_PKG+PADDING_SIZE]={0};	
-char spi_package[2]={0};
+char spi_package[4]={0x55,0,0,0};
 enum states {sync1, wait, sync2, Length, Length2, Type, ReadData, Check1, Check2};
 enum tilstande {scope, set_sample, set_gen, BodePlot};
 enum parameter {shape_s,amplitude_s,freq_s};
@@ -100,11 +100,11 @@ int main(void){
 		
 		//"Start" er modtaget. Spi-pakken-opdateres og der loopes med increments af 1Hz.
 		case BodePlot:
-			spi_package[0] = 7;
+			spi_package[1] = SPI_FREQ;
 			for(int i = 0; i<=255;i++){//adjust frequency 
-				spi_package[1]= sampleBuffer[adc_user][bufferCounter];
-				
-				//send SPI package
+				spi_package[2]= sampleBuffer[adc_user][bufferCounter];
+				spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
+				transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);				
 				
 				//Wait to make sure ADC sample is taken at target frequency TODO
 				_delay_ms(10);
@@ -235,22 +235,28 @@ void handle_generator(){
 			if (param == shape_s){
 				telecommand[1+HEADER_SIZE] = SW;
 				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
-				spi_package[0]=4;
-				spi_package[1]=SW;	
+				spi_package[1]=SPI_SHAPE;
+				spi_package[2]=SW;	
+				spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
+				transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
 			}
 			
 			else if (param == amplitude_s){
 				telecommand[2+HEADER_SIZE] = SW;
 				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
-				spi_package[0]=5;
-				spi_package[1]=SW;
+				spi_package[1]=SPI_AMP;
+				spi_package[2]=SW;
+				spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
+				transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
 			}
 			
 			else if (param == freq_s){
 				telecommand[3+HEADER_SIZE] = SW;
 				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);	
-				spi_package[0]=7;
-				spi_package[1]=SW;
+				spi_package[1]=SPI_FREQ;
+				spi_package[2]=SW;
+				spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
+				transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
 				
 			}
 		break;
@@ -284,17 +290,19 @@ void handle_generator(){
 			TOGGLEBIT(stop,0);
 			if(CHKBIT(stop,0)) CLRBIT(ADCSRA,ADEN);
 			else SETBIT(ADCSRA,ADEN);
-			spi_package[0] = stop;
-			spi_package[1] = 0;
-			//send stop-byte on SPI
+			spi_package[1] = stop;
+			spi_package[2] = 0;
+			spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
+			transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
 			break;
 
 //RESET: Toggle reset-byte og opdater dette i spi-package. 		
 		case RESET:
-			spi_package[0] = RESET_SPI;
-			spi_package[1] = 0;
+			spi_package[1] = RESET_SPI;
+			spi_package[2] = 0;
+			spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
+			transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
 			resetLabview();
-			//send reset_byte + 0data SPI;
 			break;
 			
 	}
@@ -413,6 +421,13 @@ unsigned int calcCheckSum(char * data, unsigned int dataSize){
 	}
 }
 
+char calcSPIchecksum(char *data, char dataSize){
+	unsigned char chekSum = 0;
+	for(int i=0;i<SPI_DATA_SIZE-1;i++){
+		chekSum ^=data[i];
+	}
+	return chekSum;
+}
 
 void debug_print_char(char input){
 	if(DEVEL){

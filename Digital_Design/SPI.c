@@ -10,7 +10,7 @@
 
 void init_spi_master(){
 	DDRB |= (1<<DDB2) | (1<<DDB1) | (1<<DDB0);
-	SPCR |= (1<<SPE) | (1<<MSTR) | (1<<CPHA) | (1<<SPR1);
+	SPCR |= (1<<SPE) | (1<<MSTR) | (1<<SPR1); //SPI-MODE 0, sample rising setup falling.
 }
 
 
@@ -32,4 +32,11 @@ void transmit_spi_master(unsigned char cx){
 unsigned char receive_spi_slave(void){
 	while(!(SPSR & (1<<SPIF)));					//Wait for a byte to shift in
 	return SPDR;
+}
+
+
+void transmit_Spi_pkg(char *data, char size){	//Transmit full SPI-datapackage
+	for(int i =0; i<size;i++){
+		transmit_spi_master(data[i]);
+	}
 }

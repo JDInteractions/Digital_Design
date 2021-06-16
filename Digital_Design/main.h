@@ -34,6 +34,7 @@
 #include "I2C.h"
 #include "ssd1306.h"
 
+#include "SPI.h"
 // ================================================
 // Defines/macros
 // ================================================
@@ -55,6 +56,13 @@
 
 //SPI data
 #define RESET_SPI 0x01
+#define SPI_DATA_SIZE 4
+#define SPI_RESET 0x01
+#define SPI_START 0x02
+#define SPI_STOP 0x03
+#define SPI_SHAPE 0x04
+#define SPI_AMP 0x05
+#define SPI_FREQ 0x07
 
 //Telecommand types
 #define GENERATOR_TYPE	0x01
@@ -76,7 +84,7 @@
 #define SAMPLE_BUF	1100 
 
 //Checksum
-#define CKSUM_TYPE	1	//ZERO16=0  ,  LRC8=1
+#define CKSUM_TYPE	0	//ZERO16=0  ,  LRC8=1
 
 
 
@@ -87,6 +95,7 @@ void setup();
 void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize);
 void transmitADCSample(char * data, unsigned char type, unsigned int dataSize);
 unsigned int calcCheckSum(char * data, unsigned int dataSize);
+char calcSPIchecksum(char *data, char dataSize);
 void setSampleRate(unsigned int sampleRate);
 void readBuffer();
 void debug_print_char(char input);
@@ -97,5 +106,6 @@ void handle_generator();
 void evaluate_recieve();
 void resetLabview();
 unsigned int sampleRate_comp();
+
 
 #endif /* MAIN_H_ */
