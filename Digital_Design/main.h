@@ -46,8 +46,6 @@
 #define HEADER_SIZE	5
 #define FOOTER_SIZE 2
 #define PADDING_SIZE	HEADER_SIZE+FOOTER_SIZE
-#define OUTPUT_BUF_UART	1007
-#define DATA_BUF	1007
 
 //Telemetry types
 #define BTN_TYPE	0x01
@@ -82,7 +80,7 @@
 #define ADC_CHANNEL	0
 #define ADC_TRIG_SRC_PS	64
 #define MIN_RECORD_LENGTH	47
-#define SAMPLE_BUF	1100 
+#define SAMPLE_BUF	1200 
 
 //Checksum
 #define CKSUM_TYPE	1	//ZERO16=0  ,  LRC8=1

@@ -37,7 +37,7 @@ unsigned char receive_spi_slave(void){
 
 
 void transmit_Spi_pkg(char *data, char size){	//Transmit full SPI-datapackage
-	for(int i =0; i<size;i++){
+	for(int i = 0; i<size;i++){
 		transmit_spi_master(data[i]);
 	}
 }

@@ -7,9 +7,6 @@
 
 #include "main.h"
 
- 
-
-
 
 volatile char flag_uart_rx = 0;
 volatile unsigned int uart_cnt_rx = 0;
@@ -36,7 +33,7 @@ enum parameter {shape_s,amplitude_s,freq_s};
 char param = shape_s;
 char state = sync1;
 char tilstand = scope;
-volatile char uart_tx_flag = 0;
+volatile char uart_tx_flag = 1;
 volatile int uart_cnt_tx = 1;
 unsigned int dataSizeTX = 0;
 volatile int uart_cnt = 0;	
@@ -46,13 +43,13 @@ char test_buf[4]={0x55,0x07,0xff,0x00};
 //Holds latest adc sample -> read on adc interrupt
 volatile char adc_flag = 0; 
 unsigned int bufferCounter = 0;
-char sampleBuffer[2][SAMPLE_BUF] = {{0},{0}};
+char sampleBuffer[3][SAMPLE_BUF] = {{0},{0}};
 int adc_user = 0;
 int uart_user = 1;		//TODO char??
 
-//unsigned int sampleRateTarget = 1000;
+
 unsigned int recordLength = 500;	
-unsigned int nextRecordLenght = 0;
+
 
 int main(void){ 
     
@@ -136,8 +133,7 @@ int main(void){
  		sendStrXY("Rec_comp:",6,0);
  		sendStrXY("Checksum_f:",7,0);
 
-		
-		
+	
 	
 	}
 }
@@ -195,6 +191,9 @@ void setup(){
 // 	init_adc(1);
 // 	startADCSampling(ADC_CHANNEL);
 
+	//SPI
+	init_spi_master();
+
 	//Interrupt
 	sei();
 	
@@ -238,8 +237,8 @@ void handle_generator(){
 	switch(BTN)
 	{
 
-//ENTER: konstru�r en SPI-datapakke med det tilsvarende dataindhold.
-//Ligeledes opdateres telecommand-pakken.
+		//ENTER: konstru�r en SPI-datapakke med det tilsvarende dataindhold.
+		//Ligeledes opdateres telecommand-pakken.
 		case ENTER: 
 			if (param == shape_s){
 				telecommand[1+HEADER_SIZE] = SW;
@@ -276,8 +275,8 @@ void handle_generator(){
 			}
 		break;
 
-//SELECT: Tilstandsloop, som gemmer v�rdien af den nuv�rende valgte parameter (amplitude, frekvens eller shape). 
-//Opdater telecommandpakken med den tilsvarende v�rdi. 
+		//SELECT: Tilstandsloop, som gemmer v�rdien af den nuv�rende valgte parameter (amplitude, frekvens eller shape). 
+		//Opdater telecommandpakken med den tilsvarende v�rdi. 
 		case SELECT:
 			switch(param){
 				case shape_s:
@@ -300,7 +299,7 @@ void handle_generator(){
 			}
 			break;
 
-//Run/Stop: Toggle stop-char mellem de to start/stop v�rdier. Opdat�r SPI-pakken med tilh�rende v�rdi.		
+		//Run/Stop: Toggle stop-char mellem de to start/stop v�rdier. Opdat�r SPI-pakken med tilh�rende v�rdi.		
 		case START_STOP:
 			TOGGLEBIT(stop,0);
 			if(CHKBIT(stop,0)) CLRBIT(ADCSRA,ADEN);
@@ -313,7 +312,7 @@ void handle_generator(){
 			}
 			break;
 
-//RESET: Toggle reset-byte og opdater dette i spi-package. 		
+		//RESET: Toggle reset-byte og opdater dette i spi-package. 		
 		case RESET:
 			spi_package[1] = RESET_SPI;
 			spi_package[2] = 0;
@@ -393,30 +392,92 @@ void evaluate_recieve(){
 			
 		//L�s f�rste checksum-byte
 		case Check1:
-		checksum_val = (UARTBuffer[uart_cnt_rx++]<<8);
-		state = Check2;
-		break;
+			checksum_val = (UARTBuffer[uart_cnt_rx++]<<8);
+			state = Check2;
+			break;
 		
 		//L�s anden checksum-byte og kontroller om den nye int checksum_val == 0x000
 		case Check2:
-		checksum_val = checksum_val | (UARTBuffer[uart_cnt_rx]);
-		if(checksum_val==calcCheckSum(data,Len-2)){
-			rec_complete=1;	
-			uart_cnt_rx=0;
-			checksum_flag=0;
-			Len=0;
-			state = sync1;
+			checksum_val = checksum_val | (UARTBuffer[uart_cnt_rx]);
+			if(checksum_val==calcCheckSum(data,Len-2)){
+				rec_complete=1;	
+				uart_cnt_rx=0;
+				checksum_flag=0;
+				Len=0;
+				state = sync1;
+				}	
+			else{
+				checksum_flag=1;
+				uart_cnt_rx=0;
+				state = sync1;
+				Len=0;
 			}	
-		else{
-			checksum_flag=1;
-			uart_cnt_rx=0;
-			state = sync1;
-			Len=0;
-		}	
-		
-		break;
+			break;
 	}		
 }
+
+
+
+
+
+// ================================================
+// ADC
+// ================================================
+
+//Calculate and set compare match value for ADC Auto Trigger Source based on target ADC sample rate value.
+void setSampleRate(unsigned int sampleRate){
+	unsigned char compareValue = (F_CPU/(2*sampleRate))/ADC_TRIG_SRC_PS-1;
+	OCR1A = compareValue;
+	OCR1B = compareValue;
+}
+
+
+// ================================================
+// Serial
+// ================================================
+
+void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize){
+		
+		//Construct package		
+		data[0] = 0x55;
+		data[1] = 0xAA;
+		data[2] = (dataSize+PADDING_SIZE) >> 8;
+		data[3] = (dataSize+PADDING_SIZE);
+		data[4] = type;
+		
+		unsigned int checksum = calcCheckSum(data, dataSize);
+		data[HEADER_SIZE+dataSize] = checksum >> 8;
+		data[HEADER_SIZE+dataSize+1] = checksum & 0xFF;
+		
+		transmitStrUSART(data,dataSize+PADDING_SIZE);
+		
+}
+
+void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
+	
+	//Construct package
+	sampleBuffer[uart_user][0] = 0x55;
+	sampleBuffer[uart_user][1] = 0xAA;
+	sampleBuffer[uart_user][2] = (dataSize+PADDING_SIZE) >> 8;
+	sampleBuffer[uart_user][3] = (dataSize+PADDING_SIZE);
+	sampleBuffer[uart_user][4] = type;
+	
+	unsigned int checksum = calcCheckSum(data, dataSize);
+	sampleBuffer[uart_user][HEADER_SIZE+dataSize] = checksum >> 8;
+	sampleBuffer[uart_user][HEADER_SIZE+dataSize+1] = checksum & 0xFF;
+
+	transmitStrUSART(data,dataSize+PADDING_SIZE);
+	
+}
+
+void resetLabview(){
+	param = shape_s;
+	state = sync1;
+	memset(telecommand,0,11);
+	transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
+}
+
+
 
 
 
@@ -460,74 +521,10 @@ void debug_print_int(int input){
 		sprintf(temp,"%u",input);
 		sendStrXY(temp, 4,8);
 	}
-}	
+}
 
 unsigned int sampleRate_comp(unsigned int input){
 	unsigned long dividend = BAUD_EFFECT*input;
 	unsigned int samplerate = dividend/(input+PADDING_SIZE);
 	return samplerate;
-}
-
-// ================================================
-// ADC
-// ================================================
-
-
-//Calculate and set compare match value for ADC Auto Trigger Source based on target ADC sample rate value.
-void setSampleRate(unsigned int sampleRate){
-	int compareValue = (F_CPU/(2*sampleRate))/ADC_TRIG_SRC_PS-1;
-	OCR1A = compareValue;
-	OCR1B = compareValue;
-}
-
-
-// ================================================
-// Serial
-// ================================================
-
-void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize){
-		
-		//Construct package		
-		data[0] = 0x55;
-		data[1] = 0xAA;
-		data[2] = (dataSize+PADDING_SIZE) >> 8;
-		data[3] = (dataSize+PADDING_SIZE);
-		data[4] = type;
-		
-		unsigned int checksum = calcCheckSum(data, dataSize);
-		data[HEADER_SIZE+dataSize] = checksum >> 8;
-		data[HEADER_SIZE+dataSize+1] = checksum & 0xFF;
-			
-		//UDR1 = UARToutputBuffer[uart_cnt_tx++];
-		for(int i = 0; i < dataSize+PADDING_SIZE; i++){
-			putCharUSART(data[i]);
-		}
-		
-}
-
-void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
-	
-	//Construct package
-	sampleBuffer[uart_user][0] = 0x55;
-	sampleBuffer[uart_user][1] = 0xAA;
-	sampleBuffer[uart_user][2] = (dataSize+PADDING_SIZE) >> 8;
-	sampleBuffer[uart_user][3] = (dataSize+PADDING_SIZE);
-	sampleBuffer[uart_user][4] = type;
-	
-	unsigned int checksum = calcCheckSum(data, dataSize);
-	sampleBuffer[uart_user][HEADER_SIZE+dataSize] = checksum >> 8;
-	sampleBuffer[uart_user][HEADER_SIZE+dataSize+1] = checksum & 0xFF;
-	
-	//UDR1 = UARToutputBuffer[uart_cnt_tx++];
-	for(int i = 0; i < dataSize+PADDING_SIZE; i++){
-		putCharUSART(sampleBuffer[uart_user][i]);
-	}
-	
-}
-
-void resetLabview(){
-	param = shape_s;
-	state = sync1;
-	memset(telecommand,0,11);
-	transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
 }

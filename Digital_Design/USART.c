@@ -10,10 +10,10 @@
 //Initialize UART0 with receive interrupt
 void init_uart_interrupt(unsigned int  ubrr){
 	
-	UCSR0A = (1<<U2X0);										//Asynkron Double speed mode
+	UCSR0A = (1<<U2X0);									//Asynkron Double speed mode
 	UCSR0B |= (1<<RXEN0) | (1<<TXEN0) | (1<<RXCIE0);	//RX & TX & RX interrupt enable
-	UCSR0C |= (1<<UCSZ00) | (1<<UCSZ01);			//8-bit data
-	UBRR0H = (unsigned char)(ubrr>>8);				//UBRR(16-bit)
+	UCSR0C |= (1<<UCSZ00) | (1<<UCSZ01);				//8-bit data
+	UBRR0H = (unsigned char)(ubrr>>8);					//UBRR(16-bit)
 	UBRR0L = (unsigned char)ubrr;
 	
 }	
@@ -21,10 +21,10 @@ void init_uart_interrupt(unsigned int  ubrr){
 //Initialize UART0 with receive interrupt
 void init_uart_interrupt1(unsigned int  ubrr){
 	
-	UCSR1A = (1<<U2X1);										//Asynkron Double speed mode
+	UCSR1A = (1<<U2X1);									//Asynkron Double speed mode
 	UCSR1B |= (1<<RXEN1) | (1<<TXEN1) | (1<<RXCIE1);	//RX & TX enable & RX interrupt enable
-	UCSR1C |= (1<<UCSZ10) | (1<<UCSZ11);			//8-bit data
-	UBRR1H = (unsigned char)(ubrr>>8);				//UBRR(16-bit)
+	UCSR1C |= (1<<UCSZ10) | (1<<UCSZ11);				//8-bit data
+	UBRR1H = (unsigned char)(ubrr>>8);					//UBRR(16-bit)
 	UBRR1L = (unsigned char)ubrr;
 
 }
@@ -54,21 +54,13 @@ void putCharUSART(char tx){
 	UDR1 = tx;
 }
 
-//void putCharUSART(char tx){
-	//
-	//while(!(UCSR0A & (1<<UDRE0))); //continues when transmit buffer is empty
-	//UDR0 = tx;
-//}
-
-
 
 //Transmits string
 //Argument: array with data
-void transmitStrUSART(char * ptr){
+void transmitStrUSART(char * data, int dataSize){
 	
-	while(*ptr){
-		putCharUSART(*ptr);
-		ptr ++; 
+	for(int i = 0; i < dataSize; i++){
+		putCharUSART(data[i]);
 	}
 }
 

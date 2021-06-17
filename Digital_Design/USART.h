@@ -30,7 +30,7 @@ extern void init_uart_interrupt(unsigned int  ubrr);
 extern void init_uart_interrupt1(unsigned int  ubrr);
 extern char getCharUSART(void);
 extern void putCharUSART(char tx);
-extern void transmitStrUSART(char * ptr);
+extern void transmitStrUSART(char * data, int dataSize);
 extern int receiveStrUSART(char * buffer);
 extern void USART_Flush();
 
