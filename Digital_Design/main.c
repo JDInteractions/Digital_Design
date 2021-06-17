@@ -45,7 +45,7 @@ unsigned int bufferCounter = 0;
 char sampleBuffer[3][SAMPLE_BUF] = {{0},{0}};
 int adc_user = 0;
 int uart_user = 1;		//TODO char??
-char checksum_flag=0;
+
 
 
 unsigned int recordLength = 0;	
@@ -84,9 +84,8 @@ int main(void){
 			//Returns default state - "scope". 
 			case set_sample:
 				S_Rate = (data[5]<<8) | data[6];
-				RL = (data[7]<<8) | data[8];
 				setSampleRate(S_Rate);
-				recordLength = RL;
+				recordLength = (data[7]<<8) | data[8];
 				if(recordLength < MIN_RECORD_LENGTH){
 					S_rate_max = sampleRate_comp(recordLength);
 					if(S_Rate > S_rate_max){
@@ -110,7 +109,7 @@ int main(void){
 				spi_package[1] = SPI_FREQ;
 				for(int i = 0; i<=255;i++){//adjust frequency 
 					spi_package[2]= sampleBuffer[adc_user][bufferCounter];
-					spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
+					spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
 					if(!DEVEL){
 						transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);	
 					}
