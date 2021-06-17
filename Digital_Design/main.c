@@ -7,9 +7,6 @@
 
 #include "main.h"
 
- 
-
-
 
 volatile char flag_uart_rx = 0;
 volatile unsigned int uart_cnt_rx = 0;
@@ -26,7 +23,7 @@ unsigned int S_Rate, S_rate_max = 0;
 char SW = 0;
 char BTN = 0;
 char reset = 0;
-char stop = SPI_START;
+char stop = SPI_STOP;
 char telecommand[GEN_PKG+PADDING_SIZE]={0};
 char bodeBuffer[BODE_PKG+PADDING_SIZE]={0};	
 char spi_package[4]={0x55,0,0,0};
@@ -50,14 +47,14 @@ char sampleBuffer[2][SAMPLE_BUF] = {{0},{0}};
 int adc_user = 0;
 int uart_user = 1;		//TODO char??
 
-//unsigned int sampleRateTarget = 1000;
-unsigned int recordLength = 500;	
-unsigned int nextRecordLenght = 0;
+
+unsigned int recordLength = 0;	
+
 
 int main(void){ 
     
 	setup();
-	setSampleRate(10000);
+	//setSampleRate(10000);
     
     while (1){
 	
@@ -107,8 +104,8 @@ int main(void){
 		case BodePlot:
 			spi_package[1] = SPI_FREQ;
 			for(int i = 0; i<=255;i++){//adjust frequency 
-				spi_package[2]= sampleBuffer[adc_user][bufferCounter];
-				spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
+				spi_package[2]= i;
+				spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
 				if(!DEVEL){
 					transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);	
 				}
@@ -123,21 +120,14 @@ int main(void){
 			break;
 	}
 		
-		
-		
-// 		for(int i=5;i<15;i++){
-// 			OLED_buffer[i]=data[i]+0x30;
-// 		}
-		debug_print(uart_type,5);
-		debug_print(rec_complete,6);
-		debug_print(checksum_flag,7);
-		//sendStrXY("Max_rate:",4,0);
- 		sendStrXY("Type:",5,0);
- 		sendStrXY("Rec_comp:",6,0);
- 		sendStrXY("Checksum_f:",7,0);
-
-		
-		
+		//debug_print(uart_type,5);
+		//debug_print(rec_complete,6);
+		//debug_print(checksum_flag,7);
+		////sendStrXY("Max_rate:",4,0);
+ 		//sendStrXY("Type:",5,0);
+ 		//sendStrXY("Rec_comp:",6,0);
+ 		//sendStrXY("Checksum_f:",7,0);
+		_delay_ms(10);
 	
 	}
 }
@@ -160,9 +150,9 @@ ISR(ADC_vect){
 	}
 	
 	//Overflow
-	//if(bufferCounter[adc_user][0] > SAMPLE_BUF){
-	//bufferCounter[adc_user][0] = 0;
-	//}
+	if(bufferCounter > SAMPLE_BUF){
+		bufferCounter = 0;
+	}
 }
 
 //Service routine for Timer1 Compare B
@@ -186,17 +176,24 @@ void setup(){
 	init_uart_interrupt1(UBBR_D);
 
 	//Timers
-	/*init_timer1();*/
+	init_timer1();
 	
 	//SPI
 	init_spi_master();
 	
 	//ADC
-// 	init_adc(1);
-// 	startADCSampling(ADC_CHANNEL);
+ 	init_adc(1);
+ 	startADCSampling(ADC_CHANNEL);
 
 	//Interrupt
 	sei();
+	
+	//Set initial record length and sample rate
+	recordLength = 500;
+	setSampleRate(10000);
+		
+	//Reset LabView generator window
+	resetLabview();
 	
 	//OLED-display
 	_i2c_address = 0X78;
@@ -246,7 +243,7 @@ void handle_generator(){
 				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
 				spi_package[1]=SPI_SHAPE;
 				spi_package[2]=SW;	
-				spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
+				spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
 				if(!DEVEL){
 					transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
 				}
@@ -257,7 +254,7 @@ void handle_generator(){
 				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
 				spi_package[1]=SPI_AMP;
 				spi_package[2]=SW;
-				spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
+				spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
 				if(!DEVEL){
 					transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
 				}
@@ -268,7 +265,7 @@ void handle_generator(){
 				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);	
 				spi_package[1]=SPI_FREQ;
 				spi_package[2]=SW;
-				spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
+				spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
 				if(!DEVEL){
 					transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
 				}
@@ -307,7 +304,7 @@ void handle_generator(){
 			else SETBIT(ADCSRA,ADEN);
 			spi_package[1] = stop;
 			spi_package[2] = 0;
-			spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
+			spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
 			if(!DEVEL){
 				transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
 			}
@@ -317,7 +314,7 @@ void handle_generator(){
 		case RESET:
 			spi_package[1] = RESET_SPI;
 			spi_package[2] = 0;
-			spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
+			spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
 			if(!DEVEL){
 				transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
 			}
@@ -424,27 +421,42 @@ void evaluate_recieve(){
 // Utils
 // ================================================
 
-unsigned int calcCheckSum(char * data, unsigned int dataSize){
+//unsigned int calcCheckSum(char * data, unsigned int dataSize){
+	//
+	//if(CKSUM_TYPE == 0){
+		//return 0x0000;
+	//}
+	//else if(CKSUM_TYPE==1){
+		//unsigned char checkSum = 0;
+		//for(int i = 0; i < dataSize+HEADER_SIZE; i++){
+			//checkSum ^= data[i];
+		//}
+		//return 0x00 | checkSum;
+	//}
+//}
+unsigned int calcCheckSum(char * data, unsigned int pkgSize){
 	
+	//ZERO 16 checksum
 	if(CKSUM_TYPE == 0){
 		return 0x0000;
 	}
+	//LRC8 checksumcalcCheckSum
 	else if(CKSUM_TYPE==1){
 		unsigned char checkSum = 0;
-		for(int i = 0; i < dataSize+HEADER_SIZE; i++){
+		for(int i = 0; i < pkgSize; i++){
 			checkSum ^= data[i];
 		}
 		return 0x00 | checkSum;
 	}
 }
 
-char calcSPIchecksum(char *data, char dataSize){
-	unsigned char chekSum = 0;
-	for(int i=0;i<SPI_DATA_SIZE-1;i++){
-		chekSum ^=data[i];
-	}
-	return chekSum;
-}
+//char calcSPIchecksum(char *data, char dataSize){
+	//unsigned char chekSum = 0;
+	//for(int i=0;i<SPI_DATA_SIZE-1;i++){
+		//chekSum ^=data[i];
+	//}
+	//return chekSum;
+//}
 
 void debug_print_char(char input){
 	if(DEVEL){
@@ -475,7 +487,7 @@ unsigned int sampleRate_comp(unsigned int input){
 
 //Calculate and set compare match value for ADC Auto Trigger Source based on target ADC sample rate value.
 void setSampleRate(unsigned int sampleRate){
-	int compareValue = (F_CPU/(2*sampleRate))/ADC_TRIG_SRC_PS-1;
+	unsigned int compareValue = (F_CPU/(2*sampleRate))/ADC_TRIG_SRC_PS-1;
 	OCR1A = compareValue;
 	OCR1B = compareValue;
 }
@@ -494,7 +506,7 @@ void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize)
 		data[3] = (dataSize+PADDING_SIZE);
 		data[4] = type;
 		
-		unsigned int checksum = calcCheckSum(data, dataSize);
+		unsigned int checksum = calcCheckSum(data, dataSize+HEADER_SIZE);
 		data[HEADER_SIZE+dataSize] = checksum >> 8;
 		data[HEADER_SIZE+dataSize+1] = checksum & 0xFF;
 			
@@ -514,7 +526,7 @@ void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
 	sampleBuffer[uart_user][3] = (dataSize+PADDING_SIZE);
 	sampleBuffer[uart_user][4] = type;
 	
-	unsigned int checksum = calcCheckSum(data, dataSize);
+	unsigned int checksum = calcCheckSum(data, dataSize+HEADER_SIZE);
 	sampleBuffer[uart_user][HEADER_SIZE+dataSize] = checksum >> 8;
 	sampleBuffer[uart_user][HEADER_SIZE+dataSize+1] = checksum & 0xFF;
 	

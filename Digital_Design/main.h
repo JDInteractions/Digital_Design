@@ -95,8 +95,8 @@
 void setup();
 void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize);
 void transmitADCSample(char * data, unsigned char type, unsigned int dataSize);
-unsigned int calcCheckSum(char * data, unsigned int dataSize);
-char calcSPIchecksum(char *data, char dataSize);
+unsigned int calcCheckSum(char * data, unsigned int pkgSize);
+//char calcSPIchecksum(char *data, char dataSize);
 void setSampleRate(unsigned int sampleRate);
 void readBuffer();
 void debug_print_char(char input);
