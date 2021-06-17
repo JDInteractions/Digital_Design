@@ -10,7 +10,6 @@
 #endif
 
 #define F_CPU 16000000UL
-#define datasize 15
 #define BAUD_EFFECT 11520UL
 
 #ifndef MAIN_H_
@@ -80,12 +79,12 @@
 #define ADC_CHANNEL	0
 #define ADC_TRIG_SRC_PS	64
 #define MIN_RECORD_LENGTH	47
-#define SAMPLE_BUF	1200 
+#define SAMPLE_BUF	1010 
 
 //Checksum
 #define CKSUM_TYPE	1	//ZERO16=0  ,  LRC8=1
 
-
+#define datasize 15
 
 // ================================================
 // Functions
@@ -93,18 +92,22 @@
 void setup();
 void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize);
 void transmitADCSample(char * data, unsigned char type, unsigned int dataSize);
-unsigned int calcCheckSum(char * data, unsigned int dataSize);
-char calcSPIchecksum(char *data, char dataSize);
+
+
 void setSampleRate(unsigned int sampleRate);
 void readBuffer();
-void debug_print_char(char input);
-void debug_print_int(int input);
+
 enum tilstande handle_type(char input);
 void debug_print(char input, int value);
 void handle_generator();
 void evaluate_recieve();
 void resetLabview();
-unsigned int sampleRate_comp();
 
+
+//Utils
+unsigned int calcCheckSum(char * data, unsigned int pkgSize);
+unsigned int sampleRate_comp(unsigned int record_length);
+void debug_print_char(char input);
+void debug_print_int(int input);
 
 #endif /* MAIN_H_ */
