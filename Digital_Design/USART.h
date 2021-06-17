@@ -17,7 +17,7 @@
 // ================================================
 // Defines/macros
 // ================================================
-#define BAUD	115200
+#define BAUD	115200UL
 #define UBBR_S	F_CPU/16/BAUD-1		//Half Duplex single speed
 #define UBBR_D	F_CPU/8/BAUD-1		//Half Duplex double speed
 

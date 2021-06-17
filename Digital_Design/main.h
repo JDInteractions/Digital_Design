@@ -6,11 +6,11 @@
  */ 
 
 #ifndef DEVEL
-#define DEVEL 1
+#define DEVEL 0
 #endif
 
 #define F_CPU 16000000UL
-#define datasize 1007
+#define datasize 15
 #define BAUD_EFFECT 11520UL
 
 #ifndef MAIN_H_
@@ -55,6 +55,7 @@
 #define START_TYPE	0x03
 
 //SPI data
+
 #define RESET_SPI 0x01
 #define SPI_DATA_SIZE 4
 #define SPI_RESET 0x01
@@ -84,7 +85,7 @@
 #define SAMPLE_BUF	1100 
 
 //Checksum
-#define CKSUM_TYPE	0	//ZERO16=0  ,  LRC8=1
+#define CKSUM_TYPE	1	//ZERO16=0  ,  LRC8=1
 
 
 

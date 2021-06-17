@@ -10,7 +10,8 @@
 
 void init_spi_master(){
 	DDRB |= (1<<DDB2) | (1<<DDB1) | (1<<DDB0);
-	SPCR |= (1<<SPE) | (1<<MSTR) | (1<<SPR1); //SPI-MODE 0, sample rising setup falling.
+	SPCR |= (1<<SPE) | (1<<MSTR) | (1<<SPR1)| (1<<SPI2X); //SPI-MODE 0, sample rising setup falling.
+	/*PORTB |= (1<<PB0);*/
 }
 
 

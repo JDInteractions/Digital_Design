@@ -20,12 +20,13 @@ unsigned int checksum_val = 0;
 char checksum_flag = 0;
 char rec_complete = 0;
 char data[datasize] = {0};
-char OLED_buffer[20]={0};
+/*char OLED_buffer[20]={0};*/
 unsigned int RL = 0;
 unsigned int S_Rate, S_rate_max = 0;
 char SW = 0;
 char BTN = 0;
-char stop,reset = 0;
+char reset = 0;
+char stop = SPI_START;
 char telecommand[GEN_PKG+PADDING_SIZE]={0};
 char bodeBuffer[BODE_PKG+PADDING_SIZE]={0};	
 char spi_package[4]={0x55,0,0,0};
@@ -39,7 +40,9 @@ volatile char uart_tx_flag = 0;
 volatile int uart_cnt_tx = 1;
 unsigned int dataSizeTX = 0;
 volatile int uart_cnt = 0;	
-
+volatile char transmitcompleteflag = 0;
+char test = 0xff;
+char test_buf[4]={0x55,0x07,0xff,0x00};
 //Holds latest adc sample -> read on adc interrupt
 volatile char adc_flag = 0; 
 unsigned int bufferCounter = 0;
@@ -57,7 +60,7 @@ int main(void){
 	setSampleRate(10000);
     
     while (1){
-		
+	
 	//Main tilstandsmaskine
 	//Reagerer p� uart-receive-flag. Scope er begyndelsestilstanden og herfra kaldes funktionen Handle_type.
 	//Dermed skiftes der tilstand baseret p� den modtagne uart-type. 
@@ -67,7 +70,9 @@ int main(void){
 		case scope:
 		
  			if(adc_flag){
+				transmitcompleteflag = 1;
 	 			transmitADCSample(&sampleBuffer[uart_user][0], SCOPE_TYPE, recordLength);
+				transmitcompleteflag = 0;
 				 adc_flag = 0;
 				 
 			}
@@ -104,7 +109,9 @@ int main(void){
 			for(int i = 0; i<=255;i++){//adjust frequency 
 				spi_package[2]= sampleBuffer[adc_user][bufferCounter];
 				spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
-				transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);				
+				if(!DEVEL){
+					transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);	
+				}
 				
 				//Wait to make sure ADC sample is taken at target frequency TODO
 				_delay_ms(10);
@@ -118,10 +125,9 @@ int main(void){
 		
 		
 		
-		for(int i=5;i<15;i++){
-			OLED_buffer[i]=data[i]+0x30;
-		}	
-		sendStrXY(OLED_buffer,4,5);
+// 		for(int i=5;i<15;i++){
+// 			OLED_buffer[i]=data[i]+0x30;
+// 		}
 		debug_print(uart_type,5);
 		debug_print(rec_complete,6);
 		debug_print(checksum_flag,7);
@@ -146,10 +152,10 @@ ISR(ADC_vect){
 	
 	if(bufferCounter >= recordLength){
 		adc_flag = 1;
-		
-		adc_user = !adc_user;
-		uart_user = !uart_user;
-			
+		if(transmitcompleteflag==0){
+			adc_user = !adc_user;
+			uart_user = !uart_user;
+		}
 		bufferCounter = 0;
 	}
 	
@@ -180,11 +186,14 @@ void setup(){
 	init_uart_interrupt1(UBBR_D);
 
 	//Timers
-	init_timer1();
+	/*init_timer1();*/
+	
+	//SPI
+	init_spi_master();
 	
 	//ADC
-	init_adc(1);
-	startADCSampling(ADC_CHANNEL);
+// 	init_adc(1);
+// 	startADCSampling(ADC_CHANNEL);
 
 	//Interrupt
 	sei();
@@ -238,7 +247,9 @@ void handle_generator(){
 				spi_package[1]=SPI_SHAPE;
 				spi_package[2]=SW;	
 				spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
-				transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
+				if(!DEVEL){
+					transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
+				}
 			}
 			
 			else if (param == amplitude_s){
@@ -247,7 +258,9 @@ void handle_generator(){
 				spi_package[1]=SPI_AMP;
 				spi_package[2]=SW;
 				spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
-				transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
+				if(!DEVEL){
+					transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
+				}
 			}
 			
 			else if (param == freq_s){
@@ -256,7 +269,9 @@ void handle_generator(){
 				spi_package[1]=SPI_FREQ;
 				spi_package[2]=SW;
 				spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
-				transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
+				if(!DEVEL){
+					transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
+				}
 				
 			}
 		break;
@@ -293,7 +308,9 @@ void handle_generator(){
 			spi_package[1] = stop;
 			spi_package[2] = 0;
 			spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
-			transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
+			if(!DEVEL){
+				transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
+			}
 			break;
 
 //RESET: Toggle reset-byte og opdater dette i spi-package. 		
@@ -301,7 +318,9 @@ void handle_generator(){
 			spi_package[1] = RESET_SPI;
 			spi_package[2] = 0;
 			spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
-			transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
+			if(!DEVEL){
+				transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
+			}
 			resetLabview();
 			break;
 			
@@ -371,9 +390,7 @@ void evaluate_recieve(){
 				state = Check1;
 				
 			}
-		
-		
-		
+			
 		//L�s f�rste checksum-byte
 		case Check1:
 		checksum_val = (UARTBuffer[uart_cnt_rx++]<<8);
@@ -464,9 +481,6 @@ void setSampleRate(unsigned int sampleRate){
 }
 
 
-
-
-
 // ================================================
 // Serial
 // ================================================
@@ -514,6 +528,6 @@ void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
 void resetLabview(){
 	param = shape_s;
 	state = sync1;
-	memset(telecommand,0,GEN_PKG);
+	memset(telecommand,0,11);
 	transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
 }
