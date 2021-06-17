@@ -6,7 +6,7 @@
  */ 
 
 #ifndef DEVEL
-#define DEVEL 0
+#define DEVEL 1
 #endif
 
 #define F_CPU 16000000UL

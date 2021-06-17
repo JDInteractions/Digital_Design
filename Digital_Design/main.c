@@ -83,9 +83,9 @@ int main(void){
 			//Samplerate  is compensated for record lengths < 47. 
 			//Returns default state - "scope". 
 			case set_sample:
-				S_Rate = (data[5]<<8) | data[6];
+				S_Rate = ((unsigned int)data[5]<<8) |(unsigned int)data[6];
 				setSampleRate(S_Rate);
-				recordLength = (data[7]<<8) | data[8];
+				recordLength = ((unsigned int)data[7]<<8) |(unsigned int) data[8];
 				if(recordLength < MIN_RECORD_LENGTH){
 					S_rate_max = sampleRate_comp(recordLength);
 					if(S_Rate > S_rate_max){
