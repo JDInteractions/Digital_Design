@@ -79,35 +79,41 @@ int main(void){
 				}
 				break;
 		
-			//"Send" er modtaget. Opdat�r S_rate og Record length.
+			//SEND button pressed. S_Rate and recordLenght is updated. 
+			//Samplerate  is compensated for record lengths < 47. 
+			//Returns default state - "scope". 
 			case set_sample:
-				S_Rate = ((unsigned int)data[5]<<8)|(unsigned int)data[6]; 
+				S_Rate = (data[5]<<8) | data[6];
+				RL = (data[7]<<8) | data[8];
 				setSampleRate(S_Rate);
-				recordLength = ((unsigned int)data[7]<<8)|(unsigned int)data[8];
+				recordLength = RL;
 				if(recordLength < MIN_RECORD_LENGTH){
 					S_rate_max = sampleRate_comp(recordLength);
 					if(S_Rate > S_rate_max){
 						setSampleRate(S_rate_max);
 					}
-					if(flag_uart_rx==1){
-						flag_uart_rx=0;
-						tilstand = handle_type(uart_type);
-					}
-					break;
+				}
+				tilstand = scope;		
+				break;
 		
-			//Knaptryk fra "Generator" modtaget. Funktionen handle_generator behandler tastetryk. 
+			//Button-press from generator tab registered. "handle_generator"-function is called. 
 			case set_gen:
 				handle_generator();
 				tilstand = scope;
 				break;
 		
-			//"Start" er modtaget. Spi-pakken-opdateres og der loopes med increments af 1Hz.
+		
+			//"Start" recieved from LabView. The SPI-package is updated with an increasing byte value from 0-255. 
+			//The package is transmitted with each increment and at least one ADC-sample is completed
+			//The samples are gathered and transmitted via UART to LabView at the end of the 0-255 loop. 
 			case BodePlot:
 				spi_package[1] = SPI_FREQ;
 				for(int i = 0; i<=255;i++){//adjust frequency 
 					spi_package[2]= sampleBuffer[adc_user][bufferCounter];
-					spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
-					transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);	
+					spi_package[3]=calcSPIchecksum(spi_package,SPI_DATA_SIZE);
+					if(!DEVEL){
+						transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);	
+					}
 				
 					//Wait to make sure ADC sample is taken at target frequency TODO
 					_delay_ms(10);
