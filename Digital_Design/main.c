@@ -149,7 +149,7 @@ void setup(){
 
 	//SPI
 	init_spi_master();
-
+	PORTB |= (1<<PB0);
 	//Interrupt
 	sei();
 	
@@ -267,8 +267,8 @@ void handle_generator(){
 		//Run/Stop: Toggle stop-char mellem de to start/stop v�rdier. Opdat�r SPI-pakken med tilh�rende v�rdi.		
 		case START_STOP:
 			TOGGLEBIT(stop,0);
-			if(CHKBIT(stop,0)) CLRBIT(ADCSRA,ADEN);
-			else SETBIT(ADCSRA,ADEN);
+			//if(CHKBIT(stop,0)) CLRBIT(ADCSRA,ADEN); //TODO
+			//else SETBIT(ADCSRA,ADEN);
 			spi_package[1] = stop;
 			spi_package[2] = 0;
 			spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
