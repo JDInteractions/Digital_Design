@@ -45,6 +45,7 @@ unsigned int bufferCounter = 0;
 char sampleBuffer[3][SAMPLE_BUF] = {{0},{0}};
 int adc_user = 0;
 int uart_user = 1;		//TODO char??
+char checksum_flag=0;
 
 
 unsigned int recordLength = 0;	
@@ -57,72 +58,66 @@ int main(void){
     
     while (1){
 	
-	//Main tilstandsmaskine
-	//Reagerer p� uart-receive-flag. Scope er begyndelsestilstanden og herfra kaldes funktionen Handle_type.
-	//Dermed skiftes der tilstand baseret p� den modtagne uart-type. 
-	switch(tilstand){
+		//Main program switch case. Default/starting state is "scope",
+		//where adc_flag and uart-recieve flag is continuously polled.
+		//The "handletype()"-function returns the next state based on uart-reception. 
+		switch(tilstand){
 		
-		//Grundtilstand. Tjek for uart-flag. skift tilstand baseret p� uart-type. 
-		case scope:
+			//Grundtilstand. Tjek for uart-flag. skift tilstand baseret p� uart-type. 
+			case scope:
 		
- 			if(adc_flag){
-				uart_tx_flag = 1;
-	 			transmitADCSample(&sampleBuffer[uart_user][0], SCOPE_TYPE, recordLength);
-				uart_tx_flag = 0;
-				 adc_flag = 0;
+ 				if(adc_flag){
+					uart_tx_flag = 1;
+	 				transmitADCSample(&sampleBuffer[uart_user][0], SCOPE_TYPE, recordLength);
+					uart_tx_flag = 0;
+					 adc_flag = 0;
 				 
-			}
-			if(flag_uart_rx==1){
-				flag_uart_rx=0;
-				tilstand = handle_type(uart_type);
-			}
-			break;
-		
-		//"Send" er modtaget. Opdat�r S_rate og Record length.
-		case set_sample:
-			S_Rate = ((unsigned int)data[5]<<8)|(unsigned int)data[6]; 
-			setSampleRate(S_Rate);
-			recordLength = ((unsigned int)data[7]<<8)|(unsigned int)data[8];
-			if(recordLength < MIN_RECORD_LENGTH){
-				S_rate_max = sampleRate_comp(recordLength);
-				if(S_Rate > S_rate_max){
-					setSampleRate(S_rate_max);
 				}
-			}
-			tilstand = scope;		
-			break;
+				if(flag_uart_rx==1){
+					flag_uart_rx=0;
+					tilstand = handle_type(uart_type);
+				}
+				break;
 		
-		//Knaptryk fra "Generator" modtaget. Funktionen handle_generator behandler tastetryk. 
-		case set_gen:
-			handle_generator();
-			tilstand = scope;
-			break;
+			//"Send" er modtaget. Opdat�r S_rate og Record length.
+			case set_sample:
+				S_Rate = ((unsigned int)data[5]<<8)|(unsigned int)data[6]; 
+				setSampleRate(S_Rate);
+				recordLength = ((unsigned int)data[7]<<8)|(unsigned int)data[8];
+				if(recordLength < MIN_RECORD_LENGTH){
+					S_rate_max = sampleRate_comp(recordLength);
+					if(S_Rate > S_rate_max){
+						setSampleRate(S_rate_max);
+					}
+					if(flag_uart_rx==1){
+						flag_uart_rx=0;
+						tilstand = handle_type(uart_type);
+					}
+					break;
 		
-		//"Start" er modtaget. Spi-pakken-opdateres og der loopes med increments af 1Hz.
-		case BodePlot:
-			spi_package[1] = SPI_FREQ;
-			for(int i = 0; i<=255;i++){//adjust frequency 
-				spi_package[2]= sampleBuffer[adc_user][bufferCounter];
-				spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
-				transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);	
+			//Knaptryk fra "Generator" modtaget. Funktionen handle_generator behandler tastetryk. 
+			case set_gen:
+				handle_generator();
+				tilstand = scope;
+				break;
+		
+			//"Start" er modtaget. Spi-pakken-opdateres og der loopes med increments af 1Hz.
+			case BodePlot:
+				spi_package[1] = SPI_FREQ;
+				for(int i = 0; i<=255;i++){//adjust frequency 
+					spi_package[2]= sampleBuffer[adc_user][bufferCounter];
+					spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
+					transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);	
 				
-				//Wait to make sure ADC sample is taken at target frequency TODO
-				_delay_ms(10);
+					//Wait to make sure ADC sample is taken at target frequency TODO
+					_delay_ms(10);
 
-				bodeBuffer[i+HEADER_SIZE] = sampleBuffer[adc_user][HEADER_SIZE+bufferCounter];
-			}
-			transmitUARTPackage(bodeBuffer, BODE_TYPE, 255);
-			tilstand = scope;
-			break;
-	}
-		//debug_print(uart_type,5);
-		//debug_print(rec_complete,6);
-		//debug_print(checksum_flag,7);
-		////sendStrXY("Max_rate:",4,0);
- 		//sendStrXY("Type:",5,0);
- 		//sendStrXY("Rec_comp:",6,0);
- 		//sendStrXY("Checksum_f:",7,0);
-
+					bodeBuffer[i+HEADER_SIZE] = sampleBuffer[adc_user][HEADER_SIZE+bufferCounter];
+				}
+				transmitUARTPackage(bodeBuffer, BODE_TYPE, 255);
+				tilstand = scope;
+				break;
+		}	
 	}
 }
 
