@@ -1,0 +1,9 @@
+1: setsample (unsigned int)
+2: calcchecksum (og steder hvor den bruges rettes)
+3: calc_spi (og steder hvor den bruges rettes)
+4: fjernet transmitcomplete_flag (Skal beholdes)
+5: overflow protection i ADC ISR
+6: Fjern display output (debug print);
+7: TILFØj DELAY! (virker herfra)
+8: include record lenth in setup()
+9:
