@@ -22,18 +22,15 @@
 #include <avr/interrupt.h>
 #include <stdio.h>
 #include <stdlib.h>
-
 #include <util/delay.h>
 #include <string.h>
 #include "USART.h"
 #include "ADC.h"
 #include "Timer.h"
-
-
 #include "I2C.h"
 #include "ssd1306.h"
-
 #include "SPI.h"
+
 // ================================================
 // Defines/macros
 // ================================================
@@ -48,11 +45,6 @@
 
 #define datasize 15
 
-//Telemetry types
-#define BTN_TYPE	0x01
-#define SEND_TYPE	0x02
-#define START_TYPE	0x03
-
 //SPI data
 #define RESET_SPI 0x01
 #define SPI_DATA_SIZE 4
@@ -62,6 +54,11 @@
 #define SPI_SHAPE 0x04
 #define SPI_AMP 0x05
 #define SPI_FREQ 0x07
+
+//Telemetry types
+#define BTN_TYPE	0x01
+#define SEND_TYPE	0x02
+#define START_TYPE	0x03
 
 //Telecommand types
 #define GENERATOR_TYPE	0x01
@@ -87,7 +84,6 @@
 
 //Checksum
 #define CKSUM_TYPE	1	//ZERO16=0  ,  LRC8=1
-
 
 
 // ================================================

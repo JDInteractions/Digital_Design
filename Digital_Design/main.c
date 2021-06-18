@@ -1,54 +1,59 @@
 ﻿/* Digital_Design.c
  *
  * Created: 04-06-2021 13:21:47
- * Author : Jan & Lars
+ * Author : Jan Dyrholm Madsen s205072 & Lars Stoltenberg Grove s205035
  */ 
 
 
 #include "main.h"
 
-
+//Interrupt flags and counters
 volatile char flag_uart_rx = 0;
 volatile unsigned int uart_cnt_rx = 0;
-char UARTBuffer[datasize] = {0};
+volatile char transmitcompleteflag = 0;
+volatile char adc_flag = 0;
+
+//UART
+char telemetryPkg[datasize] = {0};				//UART RX
+char telecommandPkg[GEN_PKG+PADDING_SIZE]={0};	//UART TX
+	
+//SPI
+char SPIBufferTx[4]={0x55,0,0,0};
+	
+	
 unsigned int Len = 0;
 char uart_type = 0;
 unsigned int checksum_val = 0;
-char checksum_flag = 0;
-char rec_complete = 0;
+
 char data[datasize] = {0};
-/*char OLED_buffer[20]={0};*/
 unsigned int RL = 0;
 unsigned int S_Rate, S_rate_max = 0;
 char SW = 0;
 char BTN = 0;
 char reset = 0;
 char stop = SPI_STOP;
-char telecommand[GEN_PKG+PADDING_SIZE]={0};
+
 char bodeBuffer[BODE_PKG+PADDING_SIZE]={0};	
-char spi_package[4]={0x55,0,0,0};
-enum states {sync1, wait, sync2, Length, Length2, Type, ReadData, Check1, Check2};
+
+	
+	
+	
 enum tilstande {scope, set_sample, set_gen, BodePlot};
+char tilstand = scope;
+enum states {sync1, wait, sync2, Length, Length2, Type, ReadData, Check1, Check2};
+char state = sync1;
 enum parameter {shape_s,amplitude_s,freq_s};
 char param = shape_s;
-char state = sync1;
-char tilstand = scope;
-volatile char uart_tx_flag = 0;
-volatile int uart_cnt_tx = 1;
-unsigned int dataSizeTX = 0;
-volatile int uart_cnt = 0;	
-volatile char transmitcompleteflag = 0;
-char test = 0xff;
-char test_buf[4]={0x55,0x07,0xff,0x00};
-//Holds latest adc sample -> read on adc interrupt
-volatile char adc_flag = 0; 
-unsigned int bufferCounter = 0;
+
+
+
+//ADC sampling (double buffer)
 char sampleBuffer[2][SAMPLE_BUF] = {{0},{0}};
+unsigned int recordLength = 0;	
+unsigned int sampleCounter = 0;
 int adc_user = 0;
 int uart_user = 1;		//TODO char??
 
-
-unsigned int recordLength = 0;	
 
 
 int main(void){ 
@@ -102,18 +107,18 @@ int main(void){
 		
 		//"Start" er modtaget. Spi-pakken-opdateres og der loopes med increments af 1Hz.
 		case BodePlot:
-			spi_package[1] = SPI_FREQ;
+			SPIBufferTx[1] = SPI_FREQ;
 			for(int i = 0; i<=255;i++){//adjust frequency 
-				spi_package[2]= i;
-				spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
+				SPIBufferTx[2]= i;
+				SPIBufferTx[3]=calcCheckSum(SPIBufferTx,SPI_DATA_SIZE-1);
 				if(!DEVEL){
-					transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);	
+					transmit_Spi_pkg(SPIBufferTx,SPI_DATA_SIZE);	
 				}
 				
 				//Wait to make sure ADC sample is taken at target frequency TODO
 				_delay_ms(10);
 
-				bodeBuffer[i+HEADER_SIZE] = sampleBuffer[adc_user][HEADER_SIZE+bufferCounter];
+				bodeBuffer[i+HEADER_SIZE] = sampleBuffer[adc_user][HEADER_SIZE+sampleCounter];
 			}
 			transmitUARTPackage(bodeBuffer, BODE_TYPE, 255);
 			tilstand = scope;
@@ -192,35 +197,35 @@ void handle_generator(){
 //Ligeledes opdateres telecommand-pakken.
 		case ENTER: 
 			if (param == shape_s){
-				telecommand[1+HEADER_SIZE] = SW;
-				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
-				spi_package[1]=SPI_SHAPE;
-				spi_package[2]=SW;	
-				spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
+				telecommandPkg[1+HEADER_SIZE] = SW;
+				transmitUARTPackage(telecommandPkg,GENERATOR_TYPE,4);
+				SPIBufferTx[1]=SPI_SHAPE;
+				SPIBufferTx[2]=SW;	
+				SPIBufferTx[3]=calcCheckSum(SPIBufferTx,SPI_DATA_SIZE-1);
 				if(!DEVEL){
-					transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
+					transmit_Spi_pkg(SPIBufferTx,SPI_DATA_SIZE);
 				}
 			}
 			
 			else if (param == amplitude_s){
-				telecommand[2+HEADER_SIZE] = SW;
-				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
-				spi_package[1]=SPI_AMP;
-				spi_package[2]=SW;
-				spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
+				telecommandPkg[2+HEADER_SIZE] = SW;
+				transmitUARTPackage(telecommandPkg,GENERATOR_TYPE,4);
+				SPIBufferTx[1]=SPI_AMP;
+				SPIBufferTx[2]=SW;
+				SPIBufferTx[3]=calcCheckSum(SPIBufferTx,SPI_DATA_SIZE-1);
 				if(!DEVEL){
-					transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
+					transmit_Spi_pkg(SPIBufferTx,SPI_DATA_SIZE);
 				}
 			}
 			
 			else if (param == freq_s){
-				telecommand[3+HEADER_SIZE] = SW;
-				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);	
-				spi_package[1]=SPI_FREQ;
-				spi_package[2]=SW;
-				spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
+				telecommandPkg[3+HEADER_SIZE] = SW;
+				transmitUARTPackage(telecommandPkg,GENERATOR_TYPE,4);	
+				SPIBufferTx[1]=SPI_FREQ;
+				SPIBufferTx[2]=SW;
+				SPIBufferTx[3]=calcCheckSum(SPIBufferTx,SPI_DATA_SIZE-1);
 				if(!DEVEL){
-					transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
+					transmit_Spi_pkg(SPIBufferTx,SPI_DATA_SIZE);
 				}
 				
 			}
@@ -231,20 +236,20 @@ void handle_generator(){
 		case SELECT:
 			switch(param){
 				case shape_s:
-				telecommand[HEADER_SIZE]=1;
-				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
+				telecommandPkg[HEADER_SIZE]=1;
+				transmitUARTPackage(telecommandPkg,GENERATOR_TYPE,4);
 				param = amplitude_s;
 				break;
 				
 				case amplitude_s:
-				telecommand[HEADER_SIZE]=2;
-				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
+				telecommandPkg[HEADER_SIZE]=2;
+				transmitUARTPackage(telecommandPkg,GENERATOR_TYPE,4);
 				param = freq_s;
 				break;
 				
 				case freq_s:
-				telecommand[HEADER_SIZE] = 0;
-				transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
+				telecommandPkg[HEADER_SIZE] = 0;
+				transmitUARTPackage(telecommandPkg,GENERATOR_TYPE,4);
 				param = shape_s;
 				break;
 			}
@@ -255,21 +260,21 @@ void handle_generator(){
 			TOGGLEBIT(stop,0);
 			if(CHKBIT(stop,0)) CLRBIT(ADCSRA,ADEN);
 			else SETBIT(ADCSRA,ADEN);
-			spi_package[1] = stop;
-			spi_package[2] = 0;
-			spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
+			SPIBufferTx[1] = stop;
+			SPIBufferTx[2] = 0;
+			SPIBufferTx[3]=calcCheckSum(SPIBufferTx,SPI_DATA_SIZE-1);
 			if(!DEVEL){
-				transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
+				transmit_Spi_pkg(SPIBufferTx,SPI_DATA_SIZE);
 			}
 			break;
 
 //RESET: Toggle reset-byte og opdater dette i spi-package. 		
 		case RESET:
-			spi_package[1] = RESET_SPI;
-			spi_package[2] = 0;
-			spi_package[3]=calcCheckSum(spi_package,SPI_DATA_SIZE-1);
+			SPIBufferTx[1] = RESET_SPI;
+			SPIBufferTx[2] = 0;
+			SPIBufferTx[3]=calcCheckSum(SPIBufferTx,SPI_DATA_SIZE-1);
 			if(!DEVEL){
-				transmit_Spi_pkg(spi_package,SPI_DATA_SIZE);
+				transmit_Spi_pkg(SPIBufferTx,SPI_DATA_SIZE);
 			}
 			resetLabview();
 			break;
@@ -281,12 +286,13 @@ void handle_generator(){
 
 //Tilstandsmaskine, som genneml�ber datapakkens bestandele. 
 void readTelemetry(){
+	
 	switch(state){
 		
 		//Tjek om f�rste karakter er 0x55 og skift tilstand hvis sand. 
 		case sync1:
-			if(UARTBuffer[uart_cnt_rx] == 0x55){
-			data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
+			if(telemetryPkg[uart_cnt_rx] == 0x55){
+			data[uart_cnt_rx]=telemetryPkg[uart_cnt_rx];
 			uart_cnt_rx++;
 			state = sync2;
 			}
@@ -294,8 +300,8 @@ void readTelemetry(){
 		
 		//Tjek om anden karakter er 0xAA og skift tilstand hvis sand. Ellers skift til tilstand Sync 1 igen.
 		case sync2:
-			if(UARTBuffer[uart_cnt_rx]==0xAA){
-				data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
+			if(telemetryPkg[uart_cnt_rx]==0xAA){
+				data[uart_cnt_rx]=telemetryPkg[uart_cnt_rx];
 				uart_cnt_rx++;
 				state = Length;
 				}
@@ -308,29 +314,29 @@ void readTelemetry(){
 		
 		//L�s l�ngden af den modtagne pakke (byte1)
 		case Length:
-			data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
-			Len = (UARTBuffer[uart_cnt_rx++]<<8);
+			data[uart_cnt_rx]=telemetryPkg[uart_cnt_rx];
+			Len = (telemetryPkg[uart_cnt_rx++]<<8);
 			state = Length2;
 			break;
 		
 		//L�s l�ngden af den modtagne pakke (byte2)
 		case Length2:
-		data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
-		Len = Len + (UARTBuffer[uart_cnt_rx++]);
+		data[uart_cnt_rx]=telemetryPkg[uart_cnt_rx];
+		Len = Len + (telemetryPkg[uart_cnt_rx++]);
 		state = Type;			
 		break;
 		
 		//L�s type-byten og gem den i en char. 
 		case Type:
-		data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
-		uart_type = UARTBuffer[uart_cnt_rx++];
+		data[uart_cnt_rx]=telemetryPkg[uart_cnt_rx];
+		uart_type = telemetryPkg[uart_cnt_rx++];
 		state = ReadData;
 		break;
 		
 		//L�s data, hvis der findes databytes i pakken og gem det i data[]  IF ELSE
 		case ReadData:
 				if(uart_cnt_rx < Len-2){
-				data[uart_cnt_rx]=UARTBuffer[uart_cnt_rx];
+				data[uart_cnt_rx]=telemetryPkg[uart_cnt_rx];
 				uart_cnt_rx++;
 			break;
 			}
@@ -343,22 +349,19 @@ void readTelemetry(){
 			
 		//L�s f�rste checksum-byte
 		case Check1:
-		checksum_val = (UARTBuffer[uart_cnt_rx++]<<8);
+		checksum_val = (telemetryPkg[uart_cnt_rx++]<<8);
 		state = Check2;
 		break;
 		
 		//L�s anden checksum-byte og kontroller om den nye int checksum_val == 0x000
 		case Check2:
-		checksum_val = checksum_val | (UARTBuffer[uart_cnt_rx]);
+		checksum_val = checksum_val | (telemetryPkg[uart_cnt_rx]);
 		if(checksum_val==calcCheckSum(data,Len-2)){
-			rec_complete=1;	
 			uart_cnt_rx=0;
-			checksum_flag=0;
 			Len=0;
 			state = sync1;
 			}	
 		else{
-			checksum_flag=1;
 			uart_cnt_rx=0;
 			state = sync1;
 			Len=0;
@@ -367,8 +370,6 @@ void readTelemetry(){
 		break;
 	}		
 }
-
-
 
 
 
@@ -402,7 +403,6 @@ void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize)
 		data[HEADER_SIZE+dataSize] = checksum >> 8;
 		data[HEADER_SIZE+dataSize+1] = checksum & 0xFF;
 			
-		//UDR1 = UARToutputBuffer[uart_cnt_tx++];
 		for(int i = 0; i < dataSize+PADDING_SIZE; i++){
 			putCharUSART(data[i]);
 		}
@@ -423,12 +423,10 @@ void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
 	sampleBuffer[uart_user][HEADER_SIZE+dataSize] = checksum >> 8;
 	sampleBuffer[uart_user][HEADER_SIZE+dataSize+1] = checksum & 0xFF;
 	
-	//UDR1 = UARToutputBuffer[uart_cnt_tx++];
 	for(int i = 0; i < dataSize+PADDING_SIZE; i++){
 		putCharUSART(sampleBuffer[uart_user][i]);
 	}
 }
-
 
 
 
@@ -438,26 +436,26 @@ void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
 
 //Service routine for ADC sample ready
 ISR(ADC_vect){
-	sampleBuffer[adc_user][HEADER_SIZE+bufferCounter++] = ADCH;
+	sampleBuffer[adc_user][HEADER_SIZE+sampleCounter++] = ADCH;
 	
-	if(bufferCounter >= recordLength){
+	if(sampleCounter >= recordLength){
 		adc_flag = 1;
 		if(transmitcompleteflag==0){
 			adc_user = !adc_user;
 			uart_user = !uart_user;
 		}
-		bufferCounter = 0;
+		sampleCounter = 0;
 	}
 	
 	//Overflow
-	if(bufferCounter > SAMPLE_BUF){
-		bufferCounter = 0;
+	if(sampleCounter > SAMPLE_BUF){
+		sampleCounter = 0;
 	}
 }
 
 //Service routine for UART receive vector
 ISR(USART1_RX_vect){
-	UARTBuffer[uart_cnt_rx] = UDR1;
+	telemetryPkg[uart_cnt_rx] = UDR1;
 	flag_uart_rx = 1;
 	readTelemetry();
 }
@@ -505,8 +503,8 @@ unsigned int sampleRate_comp(unsigned int record_length){
 void resetLabview(){
 	param = shape_s;
 	state = sync1;
-	memset(telecommand,0,11);
-	transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
+	memset(telecommandPkg,0,11);
+	transmitUARTPackage(telecommandPkg,GENERATOR_TYPE,4);
 }
 
 
