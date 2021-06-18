@@ -14,37 +14,29 @@ volatile char transmitcompleteflag = 0;
 volatile char adc_flag = 0;
 
 //UART
-char telemetryPkg[datasize] = {0};				//UART RX
+char telemetryPkg[TELEMETRY_SIZE] = {0};				//UART RX
 char telecommandPkg[GEN_PKG+PADDING_SIZE]={0};	//UART TX
 	
 //SPI
-char SPIBufferTx[4]={0x55,0,0,0};
-	
-	
+char SPIBufferTx[SPI_SIZE]={0x55,0,0,0};
+char stop = SPI_STOP;
+
+//BODE PLOT	
+char bodeBuffer[BODE_PKG+PADDING_SIZE]={0};
+
 unsigned int Len = 0;
 char uart_type = 0;
 unsigned int checksum_val = 0;
 
-char data[datasize] = {0};
-unsigned int RL = 0;
-unsigned int S_Rate, S_rate_max = 0;
-char SW = 0;
-char BTN = 0;
-char reset = 0;
-char stop = SPI_STOP;
-
-char bodeBuffer[BODE_PKG+PADDING_SIZE]={0};	
 
 	
-	
-	
+//State machines
 enum tilstande {scope, set_sample, set_gen, BodePlot};
 char tilstand = scope;
 enum states {sync1, wait, sync2, Length, Length2, Type, ReadData, Check1, Check2};
 char state = sync1;
 enum parameter {shape_s,amplitude_s,freq_s};
 char param = shape_s;
-
 
 
 //ADC sampling (double buffer)
@@ -59,7 +51,6 @@ int uart_user = 1;		//TODO char??
 int main(void){ 
     
 	setup();
-	//setSampleRate(10000);
     
     while (1){
 	
@@ -67,7 +58,7 @@ int main(void){
 	//Reagerer p� uart-receive-flag. Scope er begyndelsestilstanden og herfra kaldes funktionen Handle_type.
 	//Dermed skiftes der tilstand baseret p� den modtagne uart-type. 
 	switch(tilstand){
-		
+		unsigned int S_Rate, S_rate_max = 0;
 		//Grundtilstand. Tjek for uart-flag. skift tilstand baseret p� uart-type. 
 		case scope:
 		
@@ -86,10 +77,9 @@ int main(void){
 		
 		//"Send" er modtaget. Opdat�r S_rate og RL.
 		case set_sample:
-			S_Rate = ((unsigned int)data[5]<<8)|(unsigned int)data[6];
-			RL = ((unsigned int)data[7]<<8)|(unsigned int)data[8];
+			S_Rate = ((unsigned int)telemetryPkg[5]<<8)|(unsigned int)telemetryPkg[6];
+			recordLength = ((unsigned int)telemetryPkg[7]<<8)|(unsigned int)telemetryPkg[8];
 			setSampleRate(S_Rate);
-			recordLength = RL;
 			if(recordLength < MIN_RECORD_LENGTH){
 				S_rate_max = sampleRate_comp(recordLength);
 				if(S_Rate > S_rate_max){
@@ -123,12 +113,13 @@ int main(void){
 			transmitUARTPackage(bodeBuffer, BODE_TYPE, 255);
 			tilstand = scope;
 			break;
-	}
-		
+		}
 		_delay_ms(10);
-	
 	}
 }
+
+
+
 
 
 
@@ -186,15 +177,17 @@ enum tilstande handle_type(char input){
 //Funktion, som skelner mellem tastetryk i generator-fanen.
 //BTN-byte og SW-byte gemmes i hver sin variabel. 
 void handle_generator(){
-	BTN = data[5];
-	SW = data[6];
+	char BTN = 0;
+	char SW = 0;
+	BTN = telemetryPkg[5];
+	SW = telemetryPkg[6];
 
-//Tjek v�rdien af BTN	
+	//Tjek v�rdien af BTN	
 	switch(BTN)
 	{
 
-//ENTER: konstru�r en SPI-datapakke med det tilsvarende dataindhold.
-//Ligeledes opdateres telecommand-pakken.
+		//ENTER: konstru�r en SPI-datapakke med det tilsvarende dataindhold.
+		//Ligeledes opdateres telecommand-pakken.
 		case ENTER: 
 			if (param == shape_s){
 				telecommandPkg[1+HEADER_SIZE] = SW;
@@ -292,7 +285,6 @@ void readTelemetry(){
 		//Tjek om f�rste karakter er 0x55 og skift tilstand hvis sand. 
 		case sync1:
 			if(telemetryPkg[uart_cnt_rx] == 0x55){
-			data[uart_cnt_rx]=telemetryPkg[uart_cnt_rx];
 			uart_cnt_rx++;
 			state = sync2;
 			}
@@ -301,7 +293,6 @@ void readTelemetry(){
 		//Tjek om anden karakter er 0xAA og skift tilstand hvis sand. Ellers skift til tilstand Sync 1 igen.
 		case sync2:
 			if(telemetryPkg[uart_cnt_rx]==0xAA){
-				data[uart_cnt_rx]=telemetryPkg[uart_cnt_rx];
 				uart_cnt_rx++;
 				state = Length;
 				}
@@ -314,29 +305,25 @@ void readTelemetry(){
 		
 		//L�s l�ngden af den modtagne pakke (byte1)
 		case Length:
-			data[uart_cnt_rx]=telemetryPkg[uart_cnt_rx];
 			Len = (telemetryPkg[uart_cnt_rx++]<<8);
 			state = Length2;
 			break;
 		
 		//L�s l�ngden af den modtagne pakke (byte2)
 		case Length2:
-		data[uart_cnt_rx]=telemetryPkg[uart_cnt_rx];
-		Len = Len + (telemetryPkg[uart_cnt_rx++]);
-		state = Type;			
-		break;
+			Len = Len + (telemetryPkg[uart_cnt_rx++]);
+			state = Type;			
+			break;
 		
 		//L�s type-byten og gem den i en char. 
 		case Type:
-		data[uart_cnt_rx]=telemetryPkg[uart_cnt_rx];
-		uart_type = telemetryPkg[uart_cnt_rx++];
-		state = ReadData;
-		break;
+			uart_type = telemetryPkg[uart_cnt_rx++];
+			state = ReadData;
+			break;
 		
-		//L�s data, hvis der findes databytes i pakken og gem det i data[]  IF ELSE
+		//L�s telemetryPkg, hvis der findes databytes i pakken og gem det i telemetryPkg[]  IF ELSE
 		case ReadData:
-				if(uart_cnt_rx < Len-2){
-				data[uart_cnt_rx]=telemetryPkg[uart_cnt_rx];
+			if(uart_cnt_rx < Len-2){
 				uart_cnt_rx++;
 			break;
 			}
@@ -355,19 +342,18 @@ void readTelemetry(){
 		
 		//L�s anden checksum-byte og kontroller om den nye int checksum_val == 0x000
 		case Check2:
-		checksum_val = checksum_val | (telemetryPkg[uart_cnt_rx]);
-		if(checksum_val==calcCheckSum(data,Len-2)){
-			uart_cnt_rx=0;
-			Len=0;
-			state = sync1;
-			}	
-		else{
-			uart_cnt_rx=0;
-			state = sync1;
-			Len=0;
-		}	
-		
-		break;
+			checksum_val = checksum_val | (telemetryPkg[uart_cnt_rx]);
+			if(checksum_val==calcCheckSum(telemetryPkg,Len-2)){
+				//Checksum OK
+			}
+			else{
+				//Invalid checksum
+				
+			}
+				uart_cnt_rx=0;
+				state = sync1;
+				Len=0;
+			break;
 	}		
 }
 
@@ -406,7 +392,6 @@ void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize)
 		for(int i = 0; i < dataSize+PADDING_SIZE; i++){
 			putCharUSART(data[i]);
 		}
-		
 }
 
 

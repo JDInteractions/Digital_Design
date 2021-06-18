@@ -43,7 +43,6 @@
 #define FOOTER_SIZE 2
 #define PADDING_SIZE	HEADER_SIZE+FOOTER_SIZE
 
-#define datasize 15
 
 //SPI data
 #define RESET_SPI 0x01
@@ -54,11 +53,13 @@
 #define SPI_SHAPE 0x04
 #define SPI_AMP 0x05
 #define SPI_FREQ 0x07
+#define SPI_SIZE 4
 
 //Telemetry types
 #define BTN_TYPE	0x01
 #define SEND_TYPE	0x02
 #define START_TYPE	0x03
+#define TELEMETRY_SIZE 15
 
 //Telecommand types
 #define GENERATOR_TYPE	0x01
