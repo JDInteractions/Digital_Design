@@ -178,13 +178,6 @@ enum tilstande handle_type(char input){
 }
 
 
-void debug_print(char input, int value){
-	char temp[100]={0};
-	sprintf(temp,"%u",input);
-	sendStrXY(temp,value,13);
-}
-
-
 //Funktion, som skelner mellem tastetryk i generator-fanen.
 //BTN-byte og SW-byte gemmes i hver sin variabel. 
 void handle_generator(){
@@ -287,7 +280,7 @@ void handle_generator(){
 
 
 //Tilstandsmaskine, som genneml�ber datapakkens bestandele. 
-void evaluate_recieve(){
+void readTelemetry(){
 	switch(state){
 		
 		//Tjek om f�rste karakter er 0x55 og skift tilstand hvis sand. 
@@ -434,16 +427,8 @@ void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
 	for(int i = 0; i < dataSize+PADDING_SIZE; i++){
 		putCharUSART(sampleBuffer[uart_user][i]);
 	}
-	
 }
 
-
-void resetLabview(){
-	param = shape_s;
-	state = sync1;
-	memset(telecommand,0,11);
-	transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
-}
 
 
 
@@ -470,17 +455,15 @@ ISR(ADC_vect){
 	}
 }
 
-
-//Service routine for Timer1 Compare B
-ISR (TIMER1_COMPB_vect) {
-}
-
-
 //Service routine for UART receive vector
 ISR(USART1_RX_vect){
 	UARTBuffer[uart_cnt_rx] = UDR1;
 	flag_uart_rx = 1;
-	evaluate_recieve();
+	readTelemetry();
+}
+
+//Service routine for Timer1 Compare B
+ISR (TIMER1_COMPB_vect) {
 }
 
 
@@ -508,13 +491,24 @@ unsigned int calcCheckSum(char * data, unsigned int pkgSize){
 	}
 }
 
+
 //Calculates resulting samlerate based on record length.
 //Used to compensate for UART baud bottleneck
-unsigned int sampleRate_comp(unsigned int input){
-	unsigned long dividend = BAUD_EFFECT*input;
-	unsigned int samplerate = dividend/(input+PADDING_SIZE);
+unsigned int sampleRate_comp(unsigned int record_length){
+	unsigned long dividend = BAUD_EFFECT*record_length;
+	unsigned int samplerate = dividend/(record_length+PADDING_SIZE);
 	return samplerate;
 }
+
+
+//Reset LabView generator window to initial state
+void resetLabview(){
+	param = shape_s;
+	state = sync1;
+	memset(telecommand,0,11);
+	transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
+}
+
 
 //Prints a char to OLED display
 void debug_print_char(char input){
@@ -525,6 +519,7 @@ void debug_print_char(char input){
 	}
 }
 
+
 //Prints an int to OLED display
 void debug_print_int(int input){
 	if(DEVEL){
@@ -534,4 +529,10 @@ void debug_print_int(int input){
 	}
 }
 
+
+void debug_print(char input, int value){
+	char temp[100]={0};
+	sprintf(temp,"%u",input);
+	sendStrXY(temp,value,13);
+}
 

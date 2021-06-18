@@ -10,8 +10,7 @@
 #endif
 
 #define F_CPU 16000000UL
-#define datasize 15
-#define BAUD_EFFECT 11520UL
+
 
 #ifndef MAIN_H_
 #define MAIN_H_
@@ -46,8 +45,8 @@
 #define HEADER_SIZE	5
 #define FOOTER_SIZE 2
 #define PADDING_SIZE	HEADER_SIZE+FOOTER_SIZE
-#define OUTPUT_BUF_UART	1007
-#define DATA_BUF	1007
+
+#define datasize 15
 
 //Telemetry types
 #define BTN_TYPE	0x01
@@ -55,7 +54,6 @@
 #define START_TYPE	0x03
 
 //SPI data
-
 #define RESET_SPI 0x01
 #define SPI_DATA_SIZE 4
 #define SPI_RESET 0x01
@@ -84,6 +82,9 @@
 #define MIN_RECORD_LENGTH	47
 #define SAMPLE_BUF	1100 
 
+//UART
+#define BAUD_EFFECT 11520UL
+
 //Checksum
 #define CKSUM_TYPE	1	//ZERO16=0  ,  LRC8=1
 
@@ -93,20 +94,25 @@
 // Functions
 // ================================================
 void setup();
+
+//State machine
+enum tilstande handle_type(char input);
+void handle_generator();
+void readTelemetry();
+
+//ADC
+void setSampleRate(unsigned int sampleRate);
+
+//Serial
 void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize);
 void transmitADCSample(char * data, unsigned char type, unsigned int dataSize);
+
+//Utils
 unsigned int calcCheckSum(char * data, unsigned int pkgSize);
-//char calcSPIchecksum(char *data, char dataSize);
-void setSampleRate(unsigned int sampleRate);
-void readBuffer();
+unsigned int sampleRate_comp(unsigned int record_length);
+void resetLabview();
 void debug_print_char(char input);
 void debug_print_int(int input);
-enum tilstande handle_type(char input);
 void debug_print(char input, int value);
-void handle_generator();
-void evaluate_recieve();
-void resetLabview();
-unsigned int sampleRate_comp();
-
 
 #endif /* MAIN_H_ */
