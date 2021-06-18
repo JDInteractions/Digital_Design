@@ -120,54 +120,14 @@ int main(void){
 			break;
 	}
 		
-		//debug_print(uart_type,5);
-		//debug_print(rec_complete,6);
-		//debug_print(checksum_flag,7);
-		////sendStrXY("Max_rate:",4,0);
- 		//sendStrXY("Type:",5,0);
- 		//sendStrXY("Rec_comp:",6,0);
- 		//sendStrXY("Checksum_f:",7,0);
 		_delay_ms(10);
 	
 	}
 }
 
+
+
 // ================================================
-// Service Routines
-// ================================================
-
-//Service routine for ADC sample ready
-ISR(ADC_vect){
-	sampleBuffer[adc_user][HEADER_SIZE+bufferCounter++] = ADCH;
-	
-	if(bufferCounter >= recordLength){
-		adc_flag = 1;
-		if(transmitcompleteflag==0){
-			adc_user = !adc_user;
-			uart_user = !uart_user;
-		}
-		bufferCounter = 0;
-	}
-	
-	//Overflow
-	if(bufferCounter > SAMPLE_BUF){
-		bufferCounter = 0;
-	}
-}
-
-//Service routine for Timer1 Compare B
-ISR (TIMER1_COMPB_vect) {
-}
-
-//Service routine for UART receive vector
-ISR(USART1_RX_vect){
-	UARTBuffer[uart_cnt_rx] = UDR1;
-	flag_uart_rx = 1; 
-	evaluate_recieve();
- }
-
-
- // ================================================
 // Functions
 // ================================================
 void setup(){
@@ -417,73 +377,11 @@ void evaluate_recieve(){
 
 
 
-// ================================================
-// Utils
-// ================================================
 
-//unsigned int calcCheckSum(char * data, unsigned int dataSize){
-	//
-	//if(CKSUM_TYPE == 0){
-		//return 0x0000;
-	//}
-	//else if(CKSUM_TYPE==1){
-		//unsigned char checkSum = 0;
-		//for(int i = 0; i < dataSize+HEADER_SIZE; i++){
-			//checkSum ^= data[i];
-		//}
-		//return 0x00 | checkSum;
-	//}
-//}
-unsigned int calcCheckSum(char * data, unsigned int pkgSize){
-	
-	//ZERO 16 checksum
-	if(CKSUM_TYPE == 0){
-		return 0x0000;
-	}
-	//LRC8 checksumcalcCheckSum
-	else if(CKSUM_TYPE==1){
-		unsigned char checkSum = 0;
-		for(int i = 0; i < pkgSize; i++){
-			checkSum ^= data[i];
-		}
-		return 0x00 | checkSum;
-	}
-}
-
-//char calcSPIchecksum(char *data, char dataSize){
-	//unsigned char chekSum = 0;
-	//for(int i=0;i<SPI_DATA_SIZE-1;i++){
-		//chekSum ^=data[i];
-	//}
-	//return chekSum;
-//}
-
-void debug_print_char(char input){
-	if(DEVEL){
-		char temp[100] = {0};
-		sprintf(temp,"%u",input);
-		sendStrXY(temp, 0,0);
-	}
-}
-
-void debug_print_int(int input){
-	if(DEVEL){
-		char temp[100] = {0};
-		sprintf(temp,"%u",input);
-		sendStrXY(temp, 4,8);
-	}
-}	
-
-unsigned int sampleRate_comp(unsigned int input){
-	unsigned long dividend = BAUD_EFFECT*input;
-	unsigned int samplerate = dividend/(input+PADDING_SIZE);
-	return samplerate;
-}
 
 // ================================================
 // ADC
 // ================================================
-
 
 //Calculate and set compare match value for ADC Auto Trigger Source based on target ADC sample rate value.
 void setSampleRate(unsigned int sampleRate){
@@ -491,6 +389,7 @@ void setSampleRate(unsigned int sampleRate){
 	OCR1A = compareValue;
 	OCR1B = compareValue;
 }
+
 
 
 // ================================================
@@ -517,6 +416,7 @@ void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize)
 		
 }
 
+
 void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
 	
 	//Construct package
@@ -537,9 +437,101 @@ void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
 	
 }
 
+
 void resetLabview(){
 	param = shape_s;
 	state = sync1;
 	memset(telecommand,0,11);
 	transmitUARTPackage(telecommand,GENERATOR_TYPE,4);
 }
+
+
+
+// ================================================
+// Service Routines
+// ================================================
+
+//Service routine for ADC sample ready
+ISR(ADC_vect){
+	sampleBuffer[adc_user][HEADER_SIZE+bufferCounter++] = ADCH;
+	
+	if(bufferCounter >= recordLength){
+		adc_flag = 1;
+		if(transmitcompleteflag==0){
+			adc_user = !adc_user;
+			uart_user = !uart_user;
+		}
+		bufferCounter = 0;
+	}
+	
+	//Overflow
+	if(bufferCounter > SAMPLE_BUF){
+		bufferCounter = 0;
+	}
+}
+
+
+//Service routine for Timer1 Compare B
+ISR (TIMER1_COMPB_vect) {
+}
+
+
+//Service routine for UART receive vector
+ISR(USART1_RX_vect){
+	UARTBuffer[uart_cnt_rx] = UDR1;
+	flag_uart_rx = 1;
+	evaluate_recieve();
+}
+
+
+
+// ================================================
+// Utils
+// ================================================
+
+//Calculate checksum
+//Handles ZERO16 and LRC8 checksums
+//Returns 16-bit checksum
+unsigned int calcCheckSum(char * data, unsigned int pkgSize){
+	
+	//ZERO 16 checksum
+	if(CKSUM_TYPE == 0){
+		return 0x0000;
+	}
+	//LRC8 checksumcalcCheckSum
+	else if(CKSUM_TYPE==1){
+		unsigned char checkSum = 0;
+		for(int i = 0; i < pkgSize; i++){
+			checkSum ^= data[i];
+		}
+		return 0x00 | checkSum;
+	}
+}
+
+//Calculates resulting samlerate based on record length.
+//Used to compensate for UART baud bottleneck
+unsigned int sampleRate_comp(unsigned int input){
+	unsigned long dividend = BAUD_EFFECT*input;
+	unsigned int samplerate = dividend/(input+PADDING_SIZE);
+	return samplerate;
+}
+
+//Prints a char to OLED display
+void debug_print_char(char input){
+	if(DEVEL){
+		char temp[100] = {0};
+		sprintf(temp,"%u",input);
+		sendStrXY(temp, 0,0);
+	}
+}
+
+//Prints an int to OLED display
+void debug_print_int(int input){
+	if(DEVEL){
+		char temp[100] = {0};
+		sprintf(temp,"%u",input);
+		sendStrXY(temp, 4,8);
+	}
+}
+
+
