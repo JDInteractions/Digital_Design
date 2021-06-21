@@ -346,6 +346,9 @@ void readTelemetry(){
 			}
 			else{
 				//Invalid checksum
+				Len = 0;
+				uart_type = 0x00;
+				memset(telemetryPkg,0,TELEMETRY_SIZE);
 			}
 			uart_cnt_rx=0;
 			state = sync1;
