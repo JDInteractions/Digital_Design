@@ -2,7 +2,7 @@
  * ADC.c
  *
  * Created: 21-04-2021 13:58:47
- *  Author: Jan
+ *  Author: Jan & Lars
  */ 
 
 #include "ADC.h"

@@ -2,7 +2,7 @@
  * USART.c
  *
  * Created: 11-03-2021 17:05:56
- *  Author: Jan
+ *  Author: Jan & Lars
  */ 
 
 #include "USART.h"

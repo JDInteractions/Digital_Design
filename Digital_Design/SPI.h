@@ -2,7 +2,7 @@
  * SPI.h
  *
  * Created: 25-02-2021 16:45:29
- *  Author: BJUS
+ *  Author: Jan & Lars
  */ 
 
 #ifndef SPI_H_

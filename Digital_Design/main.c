@@ -25,10 +25,8 @@ char stop = SPI_STOP;
 char bodeBuffer[BODE_PKG+PADDING_SIZE]={0};
 
 unsigned int Len = 0;
-char uart_type = 0;
+
 unsigned int checksum_val = 0;
-
-
 	
 //State machines
 enum tilstande {scope, set_sample, set_gen, BodePlot};
@@ -37,35 +35,37 @@ enum states {sync1, wait, sync2, Length, Length2, Type, ReadData, Check1, Check2
 char state = sync1;
 enum parameter {shape_s,amplitude_s,freq_s};
 char param = shape_s;
-
+char uart_type = 0;
 
 //ADC sampling (double buffer)
 char sampleBuffer[2][SAMPLE_BUF] = {{0},{0}};
 unsigned int recordLength = 0;	
 unsigned int sampleCounter = 0;
 int adc_user = 0;
-int uart_user = 1;		//TODO char??
+int uart_user = 1;
 
 
 
 int main(void){ 
     
 	setup();
-    
+    SETBIT(DDRH, PH4); //TODO
+	SETBIT(DDRH, PH3);
+	
     while (1){
 	
 	//Main tilstandsmaskine
-	//Reagerer p� uart-receive-flag. Scope er begyndelsestilstanden og herfra kaldes funktionen Handle_type.
-	//Dermed skiftes der tilstand baseret p� den modtagne uart-type. 
+	//Reagerer på uart-receive-flag. "Scope" er begyndelsestilstanden og herfra kaldes funktionen Handle_type.
+	//Dermed skiftes der tilstand baseret på den modtagne uart-type. 
 	switch(tilstand){
 		unsigned int S_Rate, S_rate_max = 0;
-		//Grundtilstand. Tjek for uart-flag. skift tilstand baseret p� uart-type. 
+		//Grundtilstand. Tjek for uart-flag. skift tilstand baseret på uart-type. 
 		case scope:
 		
  			if(adc_flag){
-				transmitcompleteflag = 1;
+				//transmitcompleteflag = 1; //TODO
 	 			transmitADCSample(&sampleBuffer[uart_user][0], SCOPE_TYPE, recordLength);
-				transmitcompleteflag = 0;
+				//transmitcompleteflag = 0;
 				 adc_flag = 0;
 				 
 			}
@@ -75,7 +75,7 @@ int main(void){
 			}
 			break;
 		
-		//"Send" er modtaget. Opdat�r S_rate og RL.
+		//"Send" er modtaget. Opdater S_rate og RL.
 		case set_sample:
 			S_Rate = ((unsigned int)telemetryPkg[5]<<8)|(unsigned int)telemetryPkg[6];
 			recordLength = ((unsigned int)telemetryPkg[7]<<8)|(unsigned int)telemetryPkg[8];
@@ -105,7 +105,7 @@ int main(void){
 					transmit_Spi_pkg(SPIBufferTx,SPI_DATA_SIZE);	
 				}
 				
-				//Wait to make sure ADC sample is taken at target frequency TODO
+				//Wait to make sure ADC sample is taken at target frequency 
 				_delay_ms(10);
 
 				bodeBuffer[i+HEADER_SIZE] = sampleBuffer[adc_user][HEADER_SIZE+sampleCounter];
@@ -159,7 +159,8 @@ void setup(){
 	clear_display();
 }
 
-//Funktion som returnerer tilstande p� baggrund af den l�ste Type modtaget i telemetry. 
+
+//Returns next state based on received telemetry type
 enum tilstande handle_type(char input){
 	if(uart_type==0x01){
 		return set_gen;
@@ -174,20 +175,20 @@ enum tilstande handle_type(char input){
 }
 
 
-//Funktion, som skelner mellem tastetryk i generator-fanen.
-//BTN-byte og SW-byte gemmes i hver sin variabel. 
+
+//Handles and decodes button press in generator tab
 void handle_generator(){
 	char BTN = 0;
 	char SW = 0;
 	BTN = telemetryPkg[5];
 	SW = telemetryPkg[6];
 
-	//Tjek v�rdien af BTN	
+	//Get type of button press
 	switch(BTN)
 	{
 
-		//ENTER: konstru�r en SPI-datapakke med det tilsvarende dataindhold.
-		//Ligeledes opdateres telecommand-pakken.
+		//ENTER: Construct SPI-datapackage with SW value.
+		//Updates telecommand package to update Laview generator window.
 		case ENTER: 
 			if (param == shape_s){
 				telecommandPkg[1+HEADER_SIZE] = SW;
@@ -224,8 +225,8 @@ void handle_generator(){
 			}
 		break;
 
-//SELECT: Tilstandsloop, som gemmer v�rdien af den nuv�rende valgte parameter (amplitude, frekvens eller shape). 
-//Opdater telecommandpakken med den tilsvarende v�rdi. 
+		//SELECT: State loop, saves value of current parameter(amplitud, freq, shape)
+		//Updates telecommand package to update Laview generator window.
 		case SELECT:
 			switch(param){
 				case shape_s:
@@ -248,7 +249,7 @@ void handle_generator(){
 			}
 			break;
 
-//Run/Stop: Toggle stop-char mellem de to start/stop v�rdier. Opdat�r SPI-pakken med tilh�rende v�rdi.		
+		//Toggles stop-char between start/stop. Also updates SPI-package with start/stop value	
 		case START_STOP:
 			TOGGLEBIT(stop,0);
 			if(CHKBIT(stop,0)) CLRBIT(ADCSRA,ADEN);
@@ -260,8 +261,8 @@ void handle_generator(){
 				transmit_Spi_pkg(SPIBufferTx,SPI_DATA_SIZE);
 			}
 			break;
-
-//RESET: Toggle reset-byte og opdater dette i spi-package. 		
+	
+		//Toggle reset-byte and update SPI-package
 		case RESET:
 			SPIBufferTx[1] = RESET_SPI;
 			SPIBufferTx[2] = 0;
@@ -270,19 +271,18 @@ void handle_generator(){
 				transmit_Spi_pkg(SPIBufferTx,SPI_DATA_SIZE);
 			}
 			resetLabview();
-			break;
-			
+			break;	
 	}
 }
 
 
 
-//Tilstandsmaskine, som genneml�ber datapakkens bestandele. 
+//Decodes telemetry package 
 void readTelemetry(){
 	
 	switch(state){
 		
-		//Tjek om f�rste karakter er 0x55 og skift tilstand hvis sand. 
+		//Check if first character is 0x55 and set next state if true
 		case sync1:
 			if(telemetryPkg[uart_cnt_rx] == 0x55){
 			uart_cnt_rx++;
@@ -290,7 +290,7 @@ void readTelemetry(){
 			}
 			break;
 		
-		//Tjek om anden karakter er 0xAA og skift tilstand hvis sand. Ellers skift til tilstand Sync 1 igen.
+		//Check if second character is 0xAA, set next state if true. Else revert back to state sync1
 		case sync2:
 			if(telemetryPkg[uart_cnt_rx]==0xAA){
 				uart_cnt_rx++;
@@ -303,44 +303,42 @@ void readTelemetry(){
 			break;
 		
 		
-		//L�s l�ngden af den modtagne pakke (byte1)
+		//Read first length byte
 		case Length:
 			Len = (telemetryPkg[uart_cnt_rx++]<<8);
 			state = Length2;
 			break;
 		
-		//L�s l�ngden af den modtagne pakke (byte2)
+		//Read second length byte
 		case Length2:
 			Len = Len + (telemetryPkg[uart_cnt_rx++]);
 			state = Type;			
 			break;
 		
-		//L�s type-byten og gem den i en char. 
+		//Get type of package
 		case Type:
 			uart_type = telemetryPkg[uart_cnt_rx++];
 			state = ReadData;
 			break;
 		
-		//L�s telemetryPkg, hvis der findes databytes i pakken og gem det i telemetryPkg[]  IF ELSE
+		//Read data content of telemetry package
 		case ReadData:
 			if(uart_cnt_rx < Len-2){
 				uart_cnt_rx++;
 			break;
 			}
-				
-		//Hvis hele datapakken er l�st og gemt skiftes tilstand. 	
-			else{ //(uart_cnt_rx==(compare))
+			//Go to next state if all data is read
+			else{
 				state = Check1;
-				
 			}
 			
-		//L�s f�rste checksum-byte
+		//Read first checksum byte
 		case Check1:
-		checksum_val = (telemetryPkg[uart_cnt_rx++]<<8);
-		state = Check2;
-		break;
+			checksum_val = (telemetryPkg[uart_cnt_rx++]<<8);
+			state = Check2;
+			break;
 		
-		//L�s anden checksum-byte og kontroller om den nye int checksum_val == 0x000
+		//Read second checksum byte and evaluate checksum
 		case Check2:
 			checksum_val = checksum_val | (telemetryPkg[uart_cnt_rx]);
 			if(checksum_val==calcCheckSum(telemetryPkg,Len-2)){
@@ -348,11 +346,10 @@ void readTelemetry(){
 			}
 			else{
 				//Invalid checksum
-				
 			}
-				uart_cnt_rx=0;
-				state = sync1;
-				Len=0;
+			uart_cnt_rx=0;
+			state = sync1;
+			Len=0;
 			break;
 	}		
 }
@@ -376,6 +373,8 @@ void setSampleRate(unsigned int sampleRate){
 // Serial
 // ================================================
 
+//Transmit UART package
+//Appends length, type and checksum. Data is already in buffer upon function call.
 void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize){
 		
 		//Construct package		
@@ -394,9 +393,9 @@ void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize)
 		}
 }
 
-
+//Transmit ADC sample over UART. 
+//Note, only handles 2 dimensional ADC sample buffer
 void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
-	
 	//Construct package
 	sampleBuffer[uart_user][0] = 0x55;
 	sampleBuffer[uart_user][1] = 0xAA;
@@ -421,19 +420,18 @@ void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
 
 //Service routine for ADC sample ready
 ISR(ADC_vect){
+	//Save new sample to sample buffer
 	sampleBuffer[adc_user][HEADER_SIZE+sampleCounter++] = ADCH;
 	
+	//Enable adc flag if full record length is read
 	if(sampleCounter >= recordLength){
 		adc_flag = 1;
-		if(transmitcompleteflag==0){
-			adc_user = !adc_user;
-			uart_user = !uart_user;
-		}
-		sampleCounter = 0;
-	}
-	
-	//Overflow
-	if(sampleCounter > SAMPLE_BUF){
+		//if(transmitcompleteflag==0){
+		//Swap double buffer indexes 	
+		adc_user = !adc_user;
+		uart_user = !uart_user;
+		//}
+		//Reset buffer counter
 		sampleCounter = 0;
 	}
 }
@@ -445,7 +443,7 @@ ISR(USART1_RX_vect){
 	readTelemetry();
 }
 
-//Service routine for Timer1 Compare B
+//Service routine for Timer1 Compare B. Needed for Auto Trigger Source
 ISR (TIMER1_COMPB_vect) {
 }
 
@@ -475,10 +473,10 @@ unsigned int calcCheckSum(char * data, unsigned int pkgSize){
 }
 
 
-//Calculates resulting samlerate based on record length.
+//Calculates resulting samplerate based on record length.
 //Used to compensate for UART baud bottleneck
 unsigned int sampleRate_comp(unsigned int record_length){
-	unsigned long dividend = BAUD_EFFECT*record_length;
+	unsigned long dividend = BAUD_EFFECT*record_length;	
 	unsigned int samplerate = dividend/(record_length+PADDING_SIZE);
 	return samplerate;
 }
