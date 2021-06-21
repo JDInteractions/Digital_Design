@@ -52,7 +52,7 @@
 #define SPI_STOP 0x03
 #define SPI_SHAPE 0x04
 #define SPI_AMP 0x05
-#define SPI_FREQ 0x07
+#define SPI_FREQ 0x06
 #define SPI_SIZE 4
 
 //Telemetry types
