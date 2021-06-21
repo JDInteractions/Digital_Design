@@ -272,7 +272,7 @@ void handle_generator(){
 
 
 //Decodes telemetry package 
-void readTelemetry(){
+char readTelemetry(){
 	
 	switch(state){
 		
@@ -337,6 +337,7 @@ void readTelemetry(){
 			checksum_val = checksum_val | (telemetryPkg[uart_cnt_rx]);
 			if(checksum_val==calcCheckSum(telemetryPkg,Len-2)){
 				//Checksum OK
+				return 1;
 			}
 			else{
 				//Invalid checksum
@@ -349,6 +350,7 @@ void readTelemetry(){
 			Len=0;
 			break;
 	}		
+	return 0;
 }
 
 
@@ -431,8 +433,9 @@ ISR(ADC_vect){
 //Service routine for UART receive vector
 ISR(USART1_RX_vect){
 	telemetryPkg[uart_cnt_rx] = UDR1;
-	flag_uart_rx = 1;
-	readTelemetry();
+	if(readTelemetry()){
+		flag_uart_rx = 1;
+	}
 }
 
 //Service routine for Timer1 Compare B. Needed for Auto Trigger Source

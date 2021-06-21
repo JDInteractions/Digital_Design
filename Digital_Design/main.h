@@ -95,7 +95,7 @@ void setup();
 //State machine
 enum tilstande handle_type(char input);
 void handle_generator();
-void readTelemetry();
+char readTelemetry();
 
 //ADC
 void setSampleRate(unsigned int sampleRate);
