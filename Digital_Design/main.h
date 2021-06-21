@@ -84,7 +84,7 @@
 #define BAUD_EFFECT 11520UL
 
 //Checksum
-#define CKSUM_TYPE	1	//ZERO16=0  ,  LRC8=1
+#define CKSUM_TYPE	0	//ZERO16=0  ,  LRC8=1
 
 
 // ================================================

@@ -24,9 +24,7 @@ char stop = SPI_STOP;
 //BODE PLOT	
 char bodeBuffer[BODE_PKG+PADDING_SIZE]={0};
 
-unsigned int Len = 0;
 
-unsigned int checksum_val = 0;
 	
 //State machines
 enum tilstande {scope, set_sample, set_gen, BodePlot};
@@ -36,21 +34,19 @@ char state = sync1;
 enum parameter {shape_s,amplitude_s,freq_s};
 char param = shape_s;
 char uart_type = 0;
+unsigned int Len = 0;
+unsigned int checksum_val = 0;
 
 //ADC sampling (double buffer)
 char sampleBuffer[2][SAMPLE_BUF] = {{0},{0}};
 unsigned int recordLength = 0;	
 unsigned int sampleCounter = 0;
-int adc_user = 0;
-int uart_user = 1;
-
+int sample_index = 0;
 
 
 int main(void){ 
     
 	setup();
-    SETBIT(DDRH, PH4); //TODO
-	SETBIT(DDRH, PH3);
 	
     while (1){
 	
@@ -63,10 +59,8 @@ int main(void){
 		case scope:
 		
  			if(adc_flag){
-				//transmitcompleteflag = 1; //TODO
-	 			transmitADCSample(&sampleBuffer[uart_user][0], SCOPE_TYPE, recordLength);
-				//transmitcompleteflag = 0;
-				 adc_flag = 0;
+	 			transmitADCSample(&sampleBuffer[~(sample_index)&0x01][0], SCOPE_TYPE, recordLength);
+				adc_flag = 0;
 				 
 			}
 			if(flag_uart_rx==1){
@@ -108,7 +102,7 @@ int main(void){
 				//Wait to make sure ADC sample is taken at target frequency 
 				_delay_ms(10);
 
-				bodeBuffer[i+HEADER_SIZE] = sampleBuffer[adc_user][HEADER_SIZE+sampleCounter];
+				bodeBuffer[i+HEADER_SIZE] = sampleBuffer[sample_index][HEADER_SIZE+sampleCounter];
 			}
 			transmitUARTPackage(bodeBuffer, BODE_TYPE, 255);
 			tilstand = scope;
@@ -400,18 +394,18 @@ void transmitUARTPackage(char * data, unsigned char type, unsigned int dataSize)
 //Note, only handles 2 dimensional ADC sample buffer
 void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
 	//Construct package
-	sampleBuffer[uart_user][0] = 0x55;
-	sampleBuffer[uart_user][1] = 0xAA;
-	sampleBuffer[uart_user][2] = (dataSize+PADDING_SIZE) >> 8;
-	sampleBuffer[uart_user][3] = (dataSize+PADDING_SIZE);
-	sampleBuffer[uart_user][4] = type;
+	sampleBuffer[~(sample_index)&0x01][0] = 0x55;
+	sampleBuffer[~(sample_index)&0x01][1] = 0xAA;
+	sampleBuffer[~(sample_index)&0x01][2] = (dataSize+PADDING_SIZE) >> 8;
+	sampleBuffer[~(sample_index)&0x01][3] = (dataSize+PADDING_SIZE);
+	sampleBuffer[~(sample_index)&0x01][4] = type;
 	
 	unsigned int checksum = calcCheckSum(data, dataSize+HEADER_SIZE);
-	sampleBuffer[uart_user][HEADER_SIZE+dataSize] = checksum >> 8;
-	sampleBuffer[uart_user][HEADER_SIZE+dataSize+1] = checksum & 0xFF;
+	sampleBuffer[~(sample_index)&0x01][HEADER_SIZE+dataSize] = checksum >> 8;
+	sampleBuffer[~(sample_index)&0x01][HEADER_SIZE+dataSize+1] = checksum & 0xFF;
 	
 	for(int i = 0; i < dataSize+PADDING_SIZE; i++){
-		putCharUSART(sampleBuffer[uart_user][i]);
+		putCharUSART(sampleBuffer[~(sample_index)&0x01][i]);
 	}
 }
 
@@ -424,18 +418,13 @@ void transmitADCSample(char * data, unsigned char type, unsigned int dataSize){
 //Service routine for ADC sample ready
 ISR(ADC_vect){
 	//Save new sample to sample buffer
-	sampleBuffer[adc_user][HEADER_SIZE+sampleCounter++] = ADCH;
+	sampleBuffer[sample_index][HEADER_SIZE+sampleCounter++] = ADCH;
 	
-	//Enable adc flag if full record length is read
+	//Enable ADC flag if full record length is read
 	if(sampleCounter >= recordLength){
+		sampleCounter = 0;	//Reset buffer counter
+		TOGGLEBIT(sample_index, 0);	//Swap double buffer index 	
 		adc_flag = 1;
-		//if(transmitcompleteflag==0){
-		//Swap double buffer indexes 	
-		adc_user = !adc_user;
-		uart_user = !uart_user;
-		//}
-		//Reset buffer counter
-		sampleCounter = 0;
 	}
 }
 
