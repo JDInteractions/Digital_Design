@@ -61,7 +61,6 @@ int main(void){
  			if(adc_flag){
 	 			transmitADCSample(&sampleBuffer[~(sample_index)&0x01][0], SCOPE_TYPE, recordLength);
 				adc_flag = 0;
-				 
 			}
 			if(flag_uart_rx==1){
 				flag_uart_rx=0;
@@ -272,6 +271,8 @@ void handle_generator(){
 
 
 //Decodes telemetry package 
+//Returns 1 hvis package recevied and checksum OK
+//Otherwise 0
 char readTelemetry(){
 	
 	switch(state){
@@ -337,6 +338,9 @@ char readTelemetry(){
 			checksum_val = checksum_val | (telemetryPkg[uart_cnt_rx]);
 			if(checksum_val==calcCheckSum(telemetryPkg,Len-2)){
 				//Checksum OK
+				uart_cnt_rx=0;
+				state = sync1;
+				Len=0;
 				return 1;
 			}
 			else{
@@ -344,10 +348,10 @@ char readTelemetry(){
 				Len = 0;
 				uart_type = 0x00;
 				memset(telemetryPkg,0,TELEMETRY_SIZE);
+				uart_cnt_rx=0;
+				state = sync1;
+				Len=0;
 			}
-			uart_cnt_rx=0;
-			state = sync1;
-			Len=0;
 			break;
 	}		
 	return 0;
@@ -432,10 +436,10 @@ ISR(ADC_vect){
 
 //Service routine for UART receive vector
 ISR(USART1_RX_vect){
-	telemetryPkg[uart_cnt_rx] = UDR1;
-	if(readTelemetry()){
+	telemetryPkg[uart_cnt_rx] = UDR1;	//Read new byte
+	if(readTelemetry()){				//Packet received and  checksum OK
 		flag_uart_rx = 1;
-	}
+	}	
 }
 
 //Service routine for Timer1 Compare B. Needed for Auto Trigger Source
