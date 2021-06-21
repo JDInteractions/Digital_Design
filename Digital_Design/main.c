@@ -440,6 +440,9 @@ ISR(USART1_RX_vect){
 	if(readTelemetry()){				//Packet received and  checksum OK
 		flag_uart_rx = 1;
 	}	
+	if(uart_cnt_rx > TELEMETRY_SIZE){	//Overflow
+		uart_cnt_rx = 0;
+	}
 }
 
 //Service routine for Timer1 Compare B. Needed for Auto Trigger Source
